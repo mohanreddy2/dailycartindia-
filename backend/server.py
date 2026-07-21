@@ -1,4 +1,5 @@
 """DailyCart API - GPS-native hyperlocal marketplace (DailyMart + DailyServe + DailyPro + Admin)."""
+import asyncio
 import logging
 import os
 
@@ -52,11 +53,20 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("dailycart")
 
 
+async def initialize_database():
+    """Prepare indexes and demo content without blocking the web server startup."""
+    try:
+        await ensure_indexes()
+        await seed(force=False)
+        logger.info("DailyCart database initialization completed")
+    except Exception:
+        logger.exception("DailyCart database initialization failed")
+
+
 @app.on_event("startup")
 async def startup():
-    await ensure_indexes()
-    await seed(force=False)
-    logger.info("DailyCart API started")
+    asyncio.create_task(initialize_database())
+    logger.info("DailyCart API started; database initialization runs in the background")
 
 
 @app.on_event("shutdown")
