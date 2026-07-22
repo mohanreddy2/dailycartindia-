@@ -142,6 +142,8 @@ cp .env.example .env 2>/dev/null || true
 #   DB_NAME=dailycart
 #   JWT_SECRET=dailycart-dev-secret-change-me-32b
 #   CORS_ORIGINS=http://localhost:3000
+#   RAZORPAY_KEY_ID=rzp_test_xxx   # optional — enables Pay online
+#   RAZORPAY_KEY_SECRET=xxx
 python seed.py --force          # fat demo catalog
 uvicorn server:app --reload --host 0.0.0.0 --port 8000
 

@@ -52,7 +52,30 @@ https://<your-web>.onrender.com/vendor
 https://<your-web>.onrender.com/admin
 ```
 
-## 3. Connect `dailycartindia.com` in Squarespace
+## 3. Enable Razorpay (online payments)
+
+Checkout and service booking support **Cash on delivery** plus **Razorpay** (UPI / cards / netbanking).
+
+1. In the [Razorpay Dashboard](https://dashboard.razorpay.com/) → **Account & Settings → API Keys**, create **Test** keys first (or Live when ready).
+2. On Render → `dailycart-api` → **Environment**, add:
+
+| Key | Value |
+| --- | --- |
+| `RAZORPAY_KEY_ID` | `rzp_test_...` or `rzp_live_...` |
+| `RAZORPAY_KEY_SECRET` | matching secret (never commit this) |
+
+3. **Manual Deploy** `dailycart-api`, then **Manual Deploy** `dailycart-web` (so the updated checkout UI is live).
+4. Confirm online pay is on:
+
+```text
+https://<your-api>.onrender.com/api/payments/methods
+```
+
+You should see `"razorpay": true`. On checkout, **Pay online (Razorpay)** appears next to COD.
+
+Test cards (test mode): use Razorpay’s documented test card numbers from their docs. Do not put secrets in GitHub or chat — only in Render env.
+
+## 4. Connect `dailycartindia.com` in Squarespace
 
 1. In Render's `dailycart-web` service, add the custom domains:
    - `dailycartindia.com`

@@ -12,6 +12,7 @@ from routers.public_routes import router as public_router
 from routers.customer_routes import router as customer_router
 from routers.vendor_routes import router as vendor_router
 from routers.admin_routes import router as admin_router
+from routers.payment_routes import router as payment_router
 from seed import seed, ensure_indexes
 
 app = FastAPI(title="DailyCart API", version="1.0.0")
@@ -38,6 +39,7 @@ api_router.include_router(public_router)
 api_router.include_router(customer_router)
 api_router.include_router(vendor_router)
 api_router.include_router(admin_router)
+api_router.include_router(payment_router)
 
 app.include_router(api_router)
 

@@ -6,9 +6,10 @@ import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import { Skeleton } from '../../components/ui/skeleton';
 import { api, inr, errMsg } from '../../lib/api';
+import { openRazorpayCheckout } from '../../lib/razorpay';
 import { useAuth, useLocationCtx } from '../../lib/store';
 import { toast } from 'sonner';
-import { Clock, CheckCircle2, CalendarDays } from 'lucide-react';
+import { Clock, CheckCircle2, CalendarDays, Banknote, CreditCard } from 'lucide-react';
 import { EmptyState } from '../../components/shared/bits';
 import { Thumb } from '../../components/shared/thumb';
 
@@ -51,12 +52,23 @@ export default function BookService() {
   const [submitting, setSubmitting] = useState(false);
   const [confirmed, setConfirmed] = useState(null);
   const [error, setError] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('cod');
+  const [razorpayOn, setRazorpayOn] = useState(false);
 
   useEffect(() => {
     api.get(`/services/${serviceId}`)
       .then(({ data }) => setData(data))
       .catch(() => setError('Service not found'));
   }, [serviceId]);
+
+  useEffect(() => {
+    api.get('/payments/methods')
+      .then(({ data }) => {
+        setRazorpayOn(Boolean(data.razorpay));
+        if (data.razorpay) setPaymentMethod('razorpay');
+      })
+      .catch(() => setRazorpayOn(false));
+  }, []);
 
   useEffect(() => {
     setSlots(null);
@@ -72,14 +84,34 @@ export default function BookService() {
     if (!addressLine.trim()) { toast.error('Enter your address'); return; }
     setSubmitting(true);
     try {
-      const { data: bk } = await api.post('/bookings', {
-        service_id: serviceId, slot_date: date, slot_time: time,
-        address: { label: 'Home', line: addressLine, city: location.name, lat: location.lat, lng: location.lng },
+      const address = { label: 'Home', line: addressLine, city: location.name, lat: location.lat, lng: location.lng };
+      const bookingPayload = {
+        service_id: serviceId,
+        slot_date: date,
+        slot_time: time,
+        address,
         notes: notes || null,
-      });
+      };
+
+      if (paymentMethod === 'razorpay') {
+        const { data: session } = await api.post('/payments/razorpay/create', {
+          purpose: 'booking',
+          booking: bookingPayload,
+        });
+        const payment = await openRazorpayCheckout(session);
+        const { data } = await api.post('/payments/razorpay/confirm', {
+          intent_id: session.intent_id,
+          ...payment,
+        });
+        setConfirmed(data.booking);
+        return;
+      }
+
+      const { data: bk } = await api.post('/bookings', bookingPayload);
       setConfirmed(bk);
     } catch (e) {
-      toast.error(errMsg(e));
+      if (e?.message === 'Payment cancelled') toast.info('Payment cancelled');
+      else toast.error(errMsg(e) || e?.message);
     } finally {
       setSubmitting(false);
     }
@@ -94,7 +126,7 @@ export default function BookService() {
         <CheckCircle2 className="h-14 w-14 text-[hsl(var(--serve))]" />
         <h1 data-testid="booking-confirmed-heading" className="mt-3 text-xl font-bold">Booking confirmed!</h1>
         <p className="mt-1 text-sm text-muted-foreground">Booking <span className="font-semibold">{confirmed.booking_no}</span> · {confirmed.service_name}</p>
-        <p className="text-sm text-muted-foreground">{new Date(confirmed.slot_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} at {confirmed.slot_time} · Pay {inr(confirmed.price)} after service</p>
+        <p className="text-sm text-muted-foreground">{new Date(confirmed.slot_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} at {confirmed.slot_time} · {confirmed.payment_method === 'razorpay' ? `Paid ${inr(confirmed.price)}` : `Pay ${inr(confirmed.price)} after service`}</p>
         <div className="mt-5 flex gap-2">
           <Button data-testid="view-booking-button" onClick={() => navigate(`/bookings/${confirmed.id}`)}>Track booking</Button>
           <Button variant="outline" onClick={() => navigate('/')}>Back home</Button>
@@ -166,9 +198,43 @@ export default function BookService() {
         <Textarea data-testid="booking-notes-input" placeholder="Notes for the professional (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
       </section>
 
+      <Card className="space-y-2 rounded-xl p-4">
+        <h2 className="font-display text-base font-semibold">Payment</h2>
+        {razorpayOn && (
+          <button
+            type="button"
+            data-testid="booking-razorpay-option"
+            onClick={() => setPaymentMethod('razorpay')}
+            className={`flex w-full items-center gap-3 rounded-xl border-2 p-3 text-left ${paymentMethod === 'razorpay' ? 'border-[hsl(var(--serve))] bg-[hsl(var(--accent))]' : 'border-border bg-card'}`}
+          >
+            <CreditCard className="h-5 w-5 text-[hsl(var(--serve))]" />
+            <div>
+              <p className="text-sm font-semibold">Pay online (Razorpay)</p>
+              <p className="text-xs text-muted-foreground">UPI, cards, netbanking</p>
+            </div>
+          </button>
+        )}
+        <button
+          type="button"
+          data-testid="booking-cod-option"
+          onClick={() => setPaymentMethod('cod')}
+          className={`flex w-full items-center gap-3 rounded-xl border-2 p-3 text-left ${paymentMethod === 'cod' ? 'border-[hsl(var(--serve))] bg-[hsl(var(--accent))]' : 'border-border bg-card'}`}
+        >
+          <Banknote className="h-5 w-5 text-[hsl(var(--serve))]" />
+          <div>
+            <p className="text-sm font-semibold">Pay after service</p>
+            <p className="text-xs text-muted-foreground">Cash / UPI to the professional</p>
+          </div>
+        </button>
+      </Card>
+
       <Button data-testid="service-booking-confirm-button" size="lg" className="w-full bg-[hsl(var(--serve))] hover:bg-[hsl(var(--serve))]/90"
         disabled={submitting} onClick={submit}>
-        {submitting ? 'Booking…' : `Confirm booking · ${inr(service.base_price)} (pay after service)`}
+        {submitting
+          ? (paymentMethod === 'razorpay' ? 'Opening payment…' : 'Booking…')
+          : (paymentMethod === 'razorpay'
+            ? `Pay & book · ${inr(service.base_price)}`
+            : `Confirm booking · ${inr(service.base_price)} (pay after service)`)}
       </Button>
     </div>
   );

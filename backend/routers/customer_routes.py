@@ -52,28 +52,18 @@ class DisputeRequest(BaseModel):
     description: Optional[str] = None
 
 
-@router.post("/orders/checkout")
-async def checkout(body: CheckoutRequest, user: dict = Depends(get_current_user)):
-    if not body.items:
+async def _load_checkout_groups(items: List[CartItem]):
+    if not items:
         raise HTTPException(status_code=400, detail="Cart is empty")
-    # idempotency
-    if body.idempotency_key:
-        existing = await db.orders.find({
-            "customer_id": user["id"], "idempotency_key": body.idempotency_key
-        }).to_list(20)
-        if existing:
-            return {"orders": strip_id(existing), "idempotent_replay": True}
-
-    product_ids = [i.product_id for i in body.items]
+    product_ids = [i.product_id for i in items]
     products = await db.products.find({"id": {"$in": product_ids}}).to_list(len(product_ids))
     pmap = {p["id"]: p for p in products}
     missing = [pid for pid in product_ids if pid not in pmap]
     if missing:
         raise HTTPException(status_code=400, detail="Some items are no longer available")
 
-    # group by store (vendor)
     groups = {}
-    for item in body.items:
+    for item in items:
         p = pmap[item.product_id]
         if p.get("stock_qty", 0) < item.qty:
             raise HTTPException(status_code=400, detail=f"'{p['name']}' has only {p.get('stock_qty', 0)} in stock")
@@ -86,43 +76,149 @@ async def checkout(body: CheckoutRequest, user: dict = Depends(get_current_user)
         v = vmap.get(vid)
         if not v or v.get("kyc_status") != "approved" or not v.get("is_active"):
             raise HTTPException(status_code=400, detail="One of the stores is currently unavailable")
+    return groups, vmap
 
+
+async def quote_checkout_amount(items: List[CartItem]):
+    groups, vmap = await _load_checkout_groups(items)
+    total = 0.0
+    item_count = 0
+    for vid, entries in groups.items():
+        subtotal = round(sum(p["price"] * qty for p, qty in entries), 2)
+        delivery_fee = float(vmap[vid].get("delivery_fee", 25))
+        total += subtotal + delivery_fee
+        item_count += sum(qty for _, qty in entries)
+    return round(total, 2), {"item_count": item_count, "store_count": len(groups)}
+
+
+async def create_checkout_orders(
+    user: dict,
+    items: List[CartItem],
+    address: Address,
+    payment_method: str = "cod",
+    idempotency_key: Optional[str] = None,
+    payment_meta: Optional[dict] = None,
+):
+    if idempotency_key:
+        existing = await db.orders.find({
+            "customer_id": user["id"], "idempotency_key": idempotency_key
+        }).to_list(20)
+        if existing:
+            return {"orders": strip_id(existing), "idempotent_replay": True}
+
+    groups, vmap = await _load_checkout_groups(items)
     group_id = new_id()
     created = []
+    payment_meta = payment_meta or {}
     for vid, entries in groups.items():
         v = vmap[vid]
-        items = [{
+        order_items = [{
             "product_id": p["id"], "name": p["name"], "price": p["price"],
             "qty": qty, "unit": p.get("unit"), "image": p.get("image"),
         } for p, qty in entries]
-        subtotal = round(sum(i["price"] * i["qty"] for i in items), 2)
+        subtotal = round(sum(i["price"] * i["qty"] for i in order_items), 2)
         delivery_fee = float(v.get("delivery_fee", 25))
         order = {
             "id": new_id(),
             "order_no": gen_no("DC"),
             "checkout_group_id": group_id,
-            "idempotency_key": body.idempotency_key,
+            "idempotency_key": idempotency_key,
             "customer_id": user["id"],
             "customer_name": user["name"],
             "customer_phone": user.get("phone"),
             "vendor_id": vid,
             "store_name": v["name"],
-            "items": items,
+            "items": order_items,
             "subtotal": subtotal,
             "delivery_fee": delivery_fee,
             "total": round(subtotal + delivery_fee, 2),
-            "payment_method": body.payment_method,
-            "address": body.address.model_dump(),
+            "payment_method": payment_method,
+            "payment_status": payment_meta.get("payment_status", "pending" if payment_method == "cod" else "paid"),
+            "address": address.model_dump(),
             "status": "placed",
             "status_history": [{"status": "placed", "at": now_iso(), "by": "customer"}],
             "created_at": now_iso(),
         }
+        for key in ("razorpay_order_id", "razorpay_payment_id", "razorpay_signature", "paid_at"):
+            if payment_meta.get(key):
+                order[key] = payment_meta[key]
         await db.orders.insert_one(dict(order))
-        # decrement stock
         for p, qty in entries:
             await db.products.update_one({"id": p["id"]}, {"$inc": {"stock_qty": -qty}})
         created.append(order)
     return {"orders": strip_id(created), "checkout_group_id": group_id}
+
+
+async def quote_booking_amount(service_id: str):
+    svc = await db.services.find_one({"id": service_id})
+    if not svc or not svc.get("is_available", True):
+        raise HTTPException(status_code=404, detail="Service not available")
+    vendor = await db.vendors.find_one({"id": svc["vendor_id"]})
+    if not vendor or vendor.get("kyc_status") != "approved" or not vendor.get("is_active"):
+        raise HTTPException(status_code=400, detail="This provider is currently unavailable")
+    return float(svc["base_price"]), {"service_name": svc["name"], "vendor_id": vendor["id"]}
+
+
+async def create_booking_record(user: dict, body: BookingRequest, payment_meta: Optional[dict] = None):
+    svc = await db.services.find_one({"id": body.service_id})
+    if not svc or not svc.get("is_available", True):
+        raise HTTPException(status_code=404, detail="Service not available")
+    vendor = await db.vendors.find_one({"id": svc["vendor_id"]})
+    if not vendor or vendor.get("kyc_status") != "approved" or not vendor.get("is_active"):
+        raise HTTPException(status_code=400, detail="This provider is currently unavailable")
+    clash = await db.bookings.find_one({
+        "vendor_id": vendor["id"], "slot_date": body.slot_date, "slot_time": body.slot_time,
+        "status": {"$nin": ["cancelled", "declined", "completed"]},
+    })
+    if clash:
+        raise HTTPException(status_code=409, detail="This slot was just booked. Pick another time.")
+    payment_meta = payment_meta or {}
+    payment_method = payment_meta.get("payment_method", "cod")
+    booking = {
+        "id": new_id(),
+        "booking_no": gen_no("DS"),
+        "customer_id": user["id"],
+        "customer_name": user["name"],
+        "customer_phone": user.get("phone"),
+        "vendor_id": vendor["id"],
+        "vendor_name": vendor["name"],
+        "service_id": svc["id"],
+        "service_name": svc["name"],
+        "price": svc["base_price"],
+        "duration_minutes": svc.get("duration_minutes"),
+        "slot_date": body.slot_date,
+        "slot_time": body.slot_time,
+        "address": body.address.model_dump(),
+        "notes": body.notes,
+        "payment_method": payment_method,
+        "payment_status": payment_meta.get("payment_status", "pending" if payment_method == "cod" else "paid"),
+        "status": "requested",
+        "status_history": [{"status": "requested", "at": now_iso(), "by": "customer"}],
+        "created_at": now_iso(),
+    }
+    for key in ("razorpay_order_id", "razorpay_payment_id", "razorpay_signature", "paid_at"):
+        if payment_meta.get(key):
+            booking[key] = payment_meta[key]
+    await db.bookings.insert_one(dict(booking))
+    return strip_id(booking)
+
+
+@router.post("/orders/checkout")
+async def checkout(body: CheckoutRequest, user: dict = Depends(get_current_user)):
+    method = (body.payment_method or "cod").lower()
+    if method != "cod":
+        raise HTTPException(
+            status_code=400,
+            detail="Online payments must use /payments/razorpay/create then /payments/razorpay/confirm",
+        )
+    return await create_checkout_orders(
+        user=user,
+        items=body.items,
+        address=body.address,
+        payment_method="cod",
+        idempotency_key=body.idempotency_key,
+        payment_meta={"payment_status": "pending"},
+    )
 
 
 @router.get("/orders/mine")
@@ -168,41 +264,11 @@ async def cancel_order(order_id: str, user: dict = Depends(get_current_user)):
 
 @router.post("/bookings")
 async def create_booking(body: BookingRequest, user: dict = Depends(get_current_user)):
-    svc = await db.services.find_one({"id": body.service_id})
-    if not svc or not svc.get("is_available", True):
-        raise HTTPException(status_code=404, detail="Service not available")
-    vendor = await db.vendors.find_one({"id": svc["vendor_id"]})
-    if not vendor or vendor.get("kyc_status") != "approved" or not vendor.get("is_active"):
-        raise HTTPException(status_code=400, detail="This provider is currently unavailable")
-    clash = await db.bookings.find_one({
-        "vendor_id": vendor["id"], "slot_date": body.slot_date, "slot_time": body.slot_time,
-        "status": {"$nin": ["cancelled", "declined", "completed"]},
-    })
-    if clash:
-        raise HTTPException(status_code=409, detail="This slot was just booked. Pick another time.")
-    booking = {
-        "id": new_id(),
-        "booking_no": gen_no("DS"),
-        "customer_id": user["id"],
-        "customer_name": user["name"],
-        "customer_phone": user.get("phone"),
-        "vendor_id": vendor["id"],
-        "vendor_name": vendor["name"],
-        "service_id": svc["id"],
-        "service_name": svc["name"],
-        "price": svc["base_price"],
-        "duration_minutes": svc.get("duration_minutes"),
-        "slot_date": body.slot_date,
-        "slot_time": body.slot_time,
-        "address": body.address.model_dump(),
-        "notes": body.notes,
-        "payment_method": "cod",
-        "status": "requested",
-        "status_history": [{"status": "requested", "at": now_iso(), "by": "customer"}],
-        "created_at": now_iso(),
-    }
-    await db.bookings.insert_one(dict(booking))
-    return strip_id(booking)
+    return await create_booking_record(
+        user=user,
+        body=body,
+        payment_meta={"payment_method": "cod", "payment_status": "pending"},
+    )
 
 
 @router.get("/bookings/mine")

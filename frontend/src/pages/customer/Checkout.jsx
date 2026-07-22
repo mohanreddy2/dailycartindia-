@@ -1,13 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Separator } from '../../components/ui/separator';
 import { api, inr, errMsg } from '../../lib/api';
+import { openRazorpayCheckout } from '../../lib/razorpay';
 import { useAuth, useCart, useLocationCtx } from '../../lib/store';
 import { toast } from 'sonner';
-import { CheckCircle2, Banknote, MapPin, ShoppingBag } from 'lucide-react';
+import { CheckCircle2, Banknote, CreditCard, MapPin, ShoppingBag } from 'lucide-react';
 import { EmptyState } from '../../components/shared/bits';
 
 export default function Checkout() {
@@ -16,31 +17,73 @@ export default function Checkout() {
   const { location } = useLocationCtx();
   const navigate = useNavigate();
   const [addressLine, setAddressLine] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('cod');
+  const [razorpayOn, setRazorpayOn] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [placed, setPlaced] = useState(null);
   const idemKey = useMemo(() => `web-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, []);
 
+  useEffect(() => {
+    api.get('/payments/methods')
+      .then(({ data }) => {
+        setRazorpayOn(Boolean(data.razorpay));
+        if (data.razorpay) setPaymentMethod('razorpay');
+      })
+      .catch(() => setRazorpayOn(false));
+  }, []);
+
   const groupList = Object.entries(groups);
   const deliveryTotal = groupList.reduce((s, [, g]) => s + Number(g.delivery_fee ?? 25), 0);
   const grandTotal = subtotal + deliveryTotal;
+
+  const buildAddress = () => ({
+    label: 'Home',
+    line: addressLine,
+    city: location.name,
+    lat: location.lat,
+    lng: location.lng,
+  });
+
+  const buildItems = () => {
+    const items = [];
+    for (const [, g] of groupList) for (const it of g.items) items.push({ product_id: it.product.id, qty: it.qty });
+    return items;
+  };
 
   const placeOrder = async () => {
     if (!user) { toast.info('Login to place your order'); navigate('/auth?next=/checkout'); return; }
     if (!addressLine.trim()) { toast.error('Enter your delivery address'); return; }
     setPlacing(true);
     try {
-      const items = [];
-      for (const [, g] of groupList) for (const it of g.items) items.push({ product_id: it.product.id, qty: it.qty });
+      const items = buildItems();
+      const address = buildAddress();
+
+      if (paymentMethod === 'razorpay') {
+        const { data: session } = await api.post('/payments/razorpay/create', {
+          purpose: 'checkout',
+          checkout: { items, address, idempotency_key: idemKey },
+        });
+        const payment = await openRazorpayCheckout(session);
+        const { data } = await api.post('/payments/razorpay/confirm', {
+          intent_id: session.intent_id,
+          ...payment,
+        });
+        clear();
+        setPlaced(data.orders);
+        return;
+      }
+
       const { data } = await api.post('/orders/checkout', {
         items,
-        address: { label: 'Home', line: addressLine, city: location.name, lat: location.lat, lng: location.lng },
+        address,
         payment_method: 'cod',
         idempotency_key: idemKey,
       });
       clear();
       setPlaced(data.orders);
     } catch (e) {
-      toast.error(errMsg(e));
+      if (e?.message === 'Payment cancelled') toast.info('Payment cancelled');
+      else toast.error(errMsg(e) || e?.message);
     } finally {
       setPlacing(false);
     }
@@ -77,6 +120,10 @@ export default function Checkout() {
     return <div className="py-8"><EmptyState icon={ShoppingBag} title="Your cart is empty" subtitle="Add items from nearby kirana stores to checkout." actionLabel="Browse stores" onAction={() => navigate('/')} /></div>;
   }
 
+  const payLabel = paymentMethod === 'razorpay'
+    ? (placing ? 'Opening payment…' : `Pay ${inr(grandTotal)}`)
+    : (placing ? 'Placing order…' : `Place order · ${inr(grandTotal)}`);
+
   return (
     <div className="mx-auto max-w-lg space-y-5 py-5">
       <h1 className="text-xl font-bold">Checkout</h1>
@@ -109,15 +156,37 @@ export default function Checkout() {
         </Card>
       ))}
 
-      <Card data-testid="checkout-payment-card" className="rounded-xl p-4">
+      <Card data-testid="checkout-payment-card" className="space-y-2 rounded-xl p-4">
         <h2 className="font-display text-base font-semibold">Payment</h2>
-        <div data-testid="checkout-cod-option" className="mt-2 flex items-center gap-3 rounded-xl border-2 border-[hsl(var(--primary))] bg-[hsl(var(--accent))] p-3">
+        {razorpayOn && (
+          <button
+            type="button"
+            data-testid="checkout-razorpay-option"
+            onClick={() => setPaymentMethod('razorpay')}
+            className={`flex w-full items-center gap-3 rounded-xl border-2 p-3 text-left transition-colors ${paymentMethod === 'razorpay' ? 'border-[hsl(var(--primary))] bg-[hsl(var(--accent))]' : 'border-border bg-card'}`}
+          >
+            <CreditCard className="h-5 w-5 text-[hsl(var(--primary))]" />
+            <div>
+              <p className="text-sm font-semibold">Pay online (Razorpay)</p>
+              <p className="text-xs text-muted-foreground">UPI, cards, netbanking</p>
+            </div>
+          </button>
+        )}
+        <button
+          type="button"
+          data-testid="checkout-cod-option"
+          onClick={() => setPaymentMethod('cod')}
+          className={`flex w-full items-center gap-3 rounded-xl border-2 p-3 text-left transition-colors ${paymentMethod === 'cod' ? 'border-[hsl(var(--primary))] bg-[hsl(var(--accent))]' : 'border-border bg-card'}`}
+        >
           <Banknote className="h-5 w-5 text-[hsl(var(--primary))]" />
           <div>
             <p className="text-sm font-semibold">Cash on delivery</p>
-            <p className="text-xs text-muted-foreground">UPI & cards coming soon</p>
+            <p className="text-xs text-muted-foreground">Pay when your order arrives</p>
           </div>
-        </div>
+        </button>
+        {!razorpayOn && (
+          <p className="text-xs text-muted-foreground">Online pay appears after Razorpay keys are set on the API.</p>
+        )}
       </Card>
 
       <div className="rounded-xl border bg-card p-4">
@@ -128,7 +197,7 @@ export default function Checkout() {
       </div>
 
       <Button data-testid="checkout-place-order-button" size="lg" className="w-full" disabled={placing} onClick={placeOrder}>
-        {placing ? 'Placing order…' : `Place order · ${inr(grandTotal)}`}
+        {payLabel}
       </Button>
     </div>
   );

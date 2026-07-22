@@ -389,6 +389,8 @@ async def ensure_indexes():
     await db.bookings.create_index("vendor_id")
     await db.users.create_index("email")
     await db.users.create_index("phone")
+    await db.payment_intents.create_index("id", unique=True)
+    await db.payment_intents.create_index([("user_id", 1), ("created_at", -1)])
 
 
 async def seed_activity(demo_mart, demo_svc, all_marts, all_svcs, customers, pw):
