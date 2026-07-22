@@ -8,6 +8,35 @@ from core import (db, new_id, now_iso, strip_id, get_current_user, require_vendo
                   get_vendor_profile, ORDER_FLOW, BOOKING_FLOW, can_advance)
 
 router = APIRouter(prefix="/vendor", tags=["vendor"])
+MAX_INLINE_IMAGE_CHARS = 700_000  # ~500 KB source image after base64 encoding
+
+
+def validate_inline_image(image: Optional[str]) -> None:
+    if not image or not image.startswith("data:image/"):
+        return
+    if not image.startswith(("data:image/jpeg;", "data:image/png;", "data:image/webp;")):
+        raise HTTPException(status_code=400, detail="Only JPG, PNG, and WebP images are supported")
+    if len(image) > MAX_INLINE_IMAGE_CHARS:
+        raise HTTPException(status_code=400, detail="Image must be 500 KB or smaller")
+
+
+class OnboardingProduct(BaseModel):
+    name: str = Field(..., min_length=2)
+    category_slug: str
+    price: float = Field(..., gt=0)
+    mrp: Optional[float] = None
+    unit: str = "1 pc"
+    stock_qty: int = Field(0, ge=0)
+    image: Optional[str] = None
+
+
+class OnboardingService(BaseModel):
+    name: str = Field(..., min_length=2)
+    category_slug: str
+    description: Optional[str] = None
+    base_price: float = Field(..., gt=0)
+    duration_minutes: int = Field(60, gt=0)
+    image: Optional[str] = None
 
 
 class OnboardingRequest(BaseModel):
@@ -24,6 +53,8 @@ class OnboardingRequest(BaseModel):
     delivery_fee: float = 25
     kyc_id_type: str = "aadhaar"
     kyc_id_number: str = Field(..., min_length=4)
+    initial_products: List[OnboardingProduct] = []
+    initial_services: List[OnboardingService] = []
 
 
 class ProductBody(BaseModel):
@@ -69,6 +100,16 @@ async def onboarding(body: OnboardingRequest, user: dict = Depends(get_current_u
     existing = await db.vendors.find_one({"user_id": user["id"]})
     if existing:
         raise HTTPException(status_code=409, detail="You already have a vendor profile")
+    if body.type == "mart" and body.initial_services:
+        raise HTTPException(status_code=400, detail="Mart stores can only add products")
+    if body.type == "service" and body.initial_products:
+        raise HTTPException(status_code=400, detail="Service providers can only add services")
+    catalog_categories = [item.category_slug for item in (body.initial_products if body.type == "mart" else body.initial_services)]
+    if any(category not in body.category_slugs for category in catalog_categories):
+        raise HTTPException(status_code=400, detail="Each product or service must use one of your selected categories")
+    for item in [*body.initial_products, *body.initial_services]:
+        validate_inline_image(item.image)
+
     vendor = {
         "id": new_id(),
         "user_id": user["id"],
@@ -92,6 +133,26 @@ async def onboarding(body: OnboardingRequest, user: dict = Depends(get_current_u
         "created_at": now_iso(),
     }
     await db.vendors.insert_one(dict(vendor))
+    if body.type == "mart":
+        products = [{
+            "id": new_id(),
+            "vendor_id": vendor["id"],
+            **product.model_dump(),
+            "is_available": True,
+            "created_at": now_iso(),
+        } for product in body.initial_products]
+        if products:
+            await db.products.insert_many(products)
+    else:
+        services = [{
+            "id": new_id(),
+            "vendor_id": vendor["id"],
+            **service.model_dump(),
+            "is_available": True,
+            "created_at": now_iso(),
+        } for service in body.initial_services]
+        if services:
+            await db.services.insert_many(services)
     cap = "mart_vendor" if body.type == "mart" else "service_vendor"
     await db.users.update_one({"id": user["id"]}, {"$addToSet": {"capabilities": cap}})
     await db.audit_log.insert_one({"id": new_id(), "action": "vendor_onboarded", "vendor_id": vendor["id"],
@@ -229,6 +290,7 @@ async def add_product(body: ProductBody, user: dict = Depends(require_vendor)):
     vendor = await get_vendor_profile(user)
     if vendor["type"] != "mart":
         raise HTTPException(status_code=400, detail="Only mart stores manage products")
+    validate_inline_image(body.image)
     product = {"id": new_id(), "vendor_id": vendor["id"], **body.model_dump(), "created_at": now_iso()}
     await db.products.insert_one(dict(product))
     return strip_id(product)
@@ -240,6 +302,7 @@ async def update_product(product_id: str, body: ProductBody, user: dict = Depend
     product = await db.products.find_one({"id": product_id, "vendor_id": vendor["id"]})
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+    validate_inline_image(body.image)
     await db.products.update_one({"id": product_id}, {"$set": body.model_dump()})
     updated = await db.products.find_one({"id": product_id})
     return strip_id(updated)
@@ -268,6 +331,7 @@ async def add_service(body: ServiceBody, user: dict = Depends(require_vendor)):
     vendor = await get_vendor_profile(user)
     if vendor["type"] != "service":
         raise HTTPException(status_code=400, detail="Only service providers manage services")
+    validate_inline_image(body.image)
     svc = {"id": new_id(), "vendor_id": vendor["id"], **body.model_dump(), "created_at": now_iso()}
     await db.services.insert_one(dict(svc))
     return strip_id(svc)
@@ -279,6 +343,7 @@ async def update_service(service_id: str, body: ServiceBody, user: dict = Depend
     svc = await db.services.find_one({"id": service_id, "vendor_id": vendor["id"]})
     if not svc:
         raise HTTPException(status_code=404, detail="Service not found")
+    validate_inline_image(body.image)
     await db.services.update_one({"id": service_id}, {"$set": body.model_dump()})
     updated = await db.services.find_one({"id": service_id})
     return strip_id(updated)

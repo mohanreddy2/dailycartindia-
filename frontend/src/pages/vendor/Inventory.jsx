@@ -50,6 +50,16 @@ export default function Inventory() {
     } catch (e) { toast.error(errMsg(e)); }
   };
 
+  const uploadImage = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return toast.error('Please choose an image file');
+    if (file.size > 500 * 1024) return toast.error('Image must be 500 KB or smaller');
+    const reader = new FileReader();
+    reader.onload = () => setEditing((current) => ({ ...current, image: reader.result }));
+    reader.onerror = () => toast.error('Could not read that image');
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -150,8 +160,15 @@ export default function Inventory() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Image URL (optional)</Label>
-                <Input value={editing.image || ''} onChange={(e) => setEditing({ ...editing, image: e.target.value })} placeholder="https://…" />
+                <Label>Image (optional)</Label>
+                <Input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => uploadImage(e.target.files?.[0])} />
+                <p className="text-xs text-muted-foreground">JPG, PNG or WebP up to 500 KB.</p>
+                {editing.image && (
+                  <div className="flex items-center gap-3 rounded-lg border p-2">
+                    <img src={editing.image} alt="" className="h-12 w-12 rounded object-cover" />
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setEditing({ ...editing, image: '' })}>Remove image</Button>
+                  </div>
+                )}
               </div>
               <div className="flex items-center justify-between rounded-lg border p-3">
                 <Label className="text-sm">Visible to customers</Label>

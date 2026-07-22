@@ -9,7 +9,7 @@ import { Progress } from '../../components/ui/progress';
 import { api, errMsg } from '../../lib/api';
 import { useAuth, useLocationCtx } from '../../lib/store';
 import { toast } from 'sonner';
-import { Store, Wrench, Crosshair, CheckCircle2, ArrowRight, Clock } from 'lucide-react';
+import { Store, Wrench, Crosshair, CheckCircle2, ArrowRight, Clock, Plus, Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export default function Onboarding() {
@@ -27,6 +27,7 @@ export default function Onboarding() {
     type: 'mart', name: '', description: '', category_slugs: [],
     address: '', city: location.name, lat: location.lat, lng: location.lng,
     min_order: 0, delivery_fee: 25, kyc_id_type: 'aadhaar', kyc_id_number: '',
+    initial_products: [], initial_services: [],
   });
 
   useEffect(() => {
@@ -42,9 +43,46 @@ export default function Onboarding() {
   const relevantCats = cats.filter((c) => (form.type === 'mart' ? c.kind === 'product' : c.kind === 'service'));
 
   const toggleCat = (slug) => {
-    upd('category_slugs', form.category_slugs.includes(slug)
-      ? form.category_slugs.filter((s) => s !== slug)
-      : [...form.category_slugs, slug]);
+    setForm((current) => {
+      const removing = current.category_slugs.includes(slug);
+      const category_slugs = removing
+        ? current.category_slugs.filter((selected) => selected !== slug)
+        : [...current.category_slugs, slug];
+      return {
+        ...current,
+        category_slugs,
+        initial_products: removing ? current.initial_products.filter((item) => item.category_slug !== slug) : current.initial_products,
+        initial_services: removing ? current.initial_services.filter((item) => item.category_slug !== slug) : current.initial_services,
+      };
+    });
+  };
+
+  const catalogItems = form.type === 'mart' ? form.initial_products : form.initial_services;
+  const catalogKey = form.type === 'mart' ? 'initial_products' : 'initial_services';
+  const categoryName = (slug) => cats.find((c) => c.slug === slug)?.name || slug;
+
+  const addCatalogItem = () => {
+    const category_slug = form.category_slugs[0] || '';
+    const item = form.type === 'mart'
+      ? { name: '', category_slug, price: '', mrp: '', unit: '1 pc', stock_qty: 0, image: '' }
+      : { name: '', category_slug, description: '', base_price: '', duration_minutes: 60, image: '' };
+    upd(catalogKey, [...catalogItems, item]);
+  };
+
+  const updateCatalogItem = (index, key, value) => {
+    upd(catalogKey, catalogItems.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item));
+  };
+
+  const removeCatalogItem = (index) => upd(catalogKey, catalogItems.filter((_, itemIndex) => itemIndex !== index));
+
+  const uploadCatalogImage = (index, file) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return toast.error('Please choose an image file');
+    if (file.size > 500 * 1024) return toast.error('Image must be 500 KB or smaller');
+    const reader = new FileReader();
+    reader.onload = () => updateCatalogItem(index, 'image', reader.result);
+    reader.onerror = () => toast.error('Could not read that image');
+    reader.readAsDataURL(file);
   };
 
   const useGps = () => {
@@ -55,22 +93,52 @@ export default function Onboarding() {
     );
   };
 
+  const catalogComplete = catalogItems.length > 0 && catalogItems.every((item) =>
+    item.name.trim().length >= 2
+      && item.category_slug
+      && (form.type === 'mart' ? Number(item.price) > 0 : Number(item.base_price) > 0)
+  );
   const canNext = step === 0 ? !!form.type
     : step === 1 ? form.name.trim().length >= 2 && form.category_slugs.length > 0
-    : step === 2 ? form.address.trim().length >= 3 && form.city
+    : step === 2 ? catalogComplete
+    : step === 3 ? form.address.trim().length >= 3 && form.city
     : form.kyc_id_number.trim().length >= 4;
 
   const submit = async () => {
     setBusy(true);
     try {
-      await api.post('/vendor/onboarding', form);
+      const payload = {
+        ...form,
+        initial_products: form.type === 'mart'
+          ? form.initial_products.map((item) => ({
+              name: item.name.trim(),
+              category_slug: item.category_slug,
+              price: Number(item.price),
+              mrp: item.mrp ? Number(item.mrp) : null,
+              unit: item.unit || '1 pc',
+              stock_qty: Number(item.stock_qty || 0),
+              image: item.image || null,
+            }))
+          : [],
+        initial_services: form.type === 'service'
+          ? form.initial_services.map((item) => ({
+              name: item.name.trim(),
+              category_slug: item.category_slug,
+              description: item.description || null,
+              base_price: Number(item.base_price),
+              duration_minutes: Number(item.duration_minutes || 60),
+              image: item.image || null,
+            }))
+          : [],
+      };
+      await api.post('/vendor/onboarding', payload);
       await refreshMe();
       setSubmittedName(form.name);
       setSubmitted(true);
     } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); }
   };
 
-  const steps = ['Business type', 'Business details', 'Location', 'KYC verification'];
+  const steps = ['Business type', 'Business details', form.type === 'mart' ? 'Products & inventory' : 'Services & pricing', 'Location', 'KYC verification'];
 
   // ── Success screen ──────────────────────────────────────────────
   if (submitted) {
@@ -126,8 +194,8 @@ export default function Onboarding() {
     <div className="portal-vendor min-h-screen bg-background px-4 py-8">
       <div data-testid="vendor-onboarding" className="mx-auto max-w-lg">
         <h1 className="font-display text-2xl font-bold">Set up your business</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Step {step + 1} of 4 — {steps[step]}</p>
-        <Progress value={(step + 1) * 25} className="mt-3 h-2" />
+        <p className="mt-1 text-sm text-muted-foreground">Step {step + 1} of 5 — {steps[step]}</p>
+        <Progress value={(step + 1) * 20} className="mt-3 h-2" />
 
         <Card className="mt-5 rounded-2xl p-5">
           {step === 0 && (
@@ -137,7 +205,9 @@ export default function Onboarding() {
                 { v: 'service', icon: Wrench, t: 'Service professional', d: 'Plumbing, electrical, cleaning, beauty…' },
               ].map(({ v, icon: Icon, t, d }) => (
                 <button key={v} data-testid={`onboarding-type-${v}`}
-                  onClick={() => { upd('type', v); upd('category_slugs', []); }}
+                  onClick={() => {
+                    setForm((current) => ({ ...current, type: v, category_slugs: [], initial_products: [], initial_services: [] }));
+                  }}
                   className={cn('rounded-xl border-2 p-4 text-left transition-colors', form.type === v ? 'border-[hsl(var(--primary))] bg-[hsl(var(--accent))]' : 'hover:bg-muted')}>
                   <Icon className="mb-2 h-6 w-6 text-[hsl(var(--primary))]" />
                   <p className="text-sm font-semibold">{t}</p>
@@ -188,6 +258,72 @@ export default function Onboarding() {
 
           {step === 2 && (
             <div className="space-y-4">
+              <div>
+                <Label>{form.type === 'mart' ? 'Products, inventory & prices' : 'Services, prices & duration'}</Label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Add at least one offering now. You can add or update more items later from your vendor portal.
+                </p>
+              </div>
+              {catalogItems.map((item, index) => (
+                <div key={index} className="space-y-3 rounded-xl border bg-muted/30 p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold">{form.type === 'mart' ? `Product ${index + 1}` : `Service ${index + 1}`}</p>
+                    <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => removeCatalogItem(index)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>{form.type === 'mart' ? 'Product name' : 'Service name'}</Label>
+                    <Input value={item.name} onChange={(e) => updateCatalogItem(index, 'name', e.target.value)}
+                      placeholder={form.type === 'mart' ? 'e.g., Aashirvaad Atta 5 kg' : 'e.g., Standard AC servicing'} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Category</Label>
+                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={item.category_slug} onChange={(e) => updateCatalogItem(index, 'category_slug', e.target.value)}>
+                      <option value="">Select a category</option>
+                      {form.category_slugs.map((slug) => <option key={slug} value={slug}>{categoryName(slug)}</option>)}
+                    </select>
+                  </div>
+                  {form.type === 'mart' ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5"><Label>Selling price (₹)</Label><Input type="number" min="1" value={item.price} onChange={(e) => updateCatalogItem(index, 'price', e.target.value)} /></div>
+                        <div className="space-y-1.5"><Label>MRP (₹, optional)</Label><Input type="number" min="1" value={item.mrp} onChange={(e) => updateCatalogItem(index, 'mrp', e.target.value)} /></div>
+                        <div className="space-y-1.5"><Label>Unit</Label><Input value={item.unit} onChange={(e) => updateCatalogItem(index, 'unit', e.target.value)} placeholder="e.g., 1 kg" /></div>
+                        <div className="space-y-1.5"><Label>Stock quantity</Label><Input type="number" min="0" value={item.stock_qty} onChange={(e) => updateCatalogItem(index, 'stock_qty', Number(e.target.value))} /></div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="space-y-1.5"><Label>Service description (optional)</Label><Textarea rows={2} value={item.description} onChange={(e) => updateCatalogItem(index, 'description', e.target.value)} placeholder="What is included in this service?" /></div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5"><Label>Starting price (₹)</Label><Input type="number" min="1" value={item.base_price} onChange={(e) => updateCatalogItem(index, 'base_price', e.target.value)} /></div>
+                        <div className="space-y-1.5"><Label>Duration (minutes)</Label><Input type="number" min="1" value={item.duration_minutes} onChange={(e) => updateCatalogItem(index, 'duration_minutes', Number(e.target.value))} /></div>
+                      </div>
+                    </>
+                  )}
+                  <div className="space-y-1.5">
+                    <Label>Product / service image (optional)</Label>
+                    <Input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => uploadCatalogImage(index, e.target.files?.[0])} />
+                    <p className="text-xs text-muted-foreground">JPG, PNG or WebP up to 500 KB.</p>
+                    {item.image && (
+                      <div className="flex items-center gap-3 rounded-lg border p-2">
+                        <img src={item.image} alt="" className="h-12 w-12 rounded object-cover" />
+                        <Button type="button" variant="ghost" size="sm" onClick={() => updateCatalogItem(index, 'image', '')}>Remove image</Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <Button type="button" variant="outline" className="w-full gap-2" onClick={addCatalogItem} disabled={!form.category_slugs.length}>
+                <Plus className="h-4 w-4" /> Add {form.type === 'mart' ? 'product' : 'service'}
+              </Button>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="space-y-4">
               <div className="space-y-1.5">
                 <Label>Shop / base address</Label>
                 <Input data-testid="onboarding-address-input" value={form.address} onChange={(e) => upd('address', e.target.value)}
@@ -214,7 +350,7 @@ export default function Onboarding() {
             </div>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <Label>ID type</Label>
@@ -241,7 +377,7 @@ export default function Onboarding() {
 
           <div className="mt-5 flex justify-between">
             <Button variant="ghost" disabled={step === 0} onClick={() => setStep(step - 1)}>Back</Button>
-            {step < 3 ? (
+            {step < 4 ? (
               <Button data-testid="vendor-onboarding-next-button" disabled={!canNext} onClick={() => setStep(step + 1)}>Continue</Button>
             ) : (
               <Button data-testid="vendor-onboarding-submit-button" disabled={!canNext || busy} onClick={submit}>
