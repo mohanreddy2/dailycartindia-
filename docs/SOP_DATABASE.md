@@ -28,6 +28,12 @@ Never paste `MONGO_URL`, passwords, or KYC ID numbers into git or chat.
 14. [Seed, backups, and recovery](#14-seed-backups-and-recovery)
 15. [Local Mongo vs production](#15-local-mongo-vs-production)
 16. [Checklist after any live edit](#16-checklist-after-any-live-edit)
+17. [Compass and mongosh (optional)](#17-compass-and-mongosh-optional)
+18. [Atlas website login vs database user](#18-atlas-website-login-vs-database-user)
+19. [Seeded cities and categories (exact lists)](#19-seeded-cities-and-categories-exact-lists)
+20. [Example documents (shape the API writes)](#20-example-documents-shape-the-api-writes)
+21. [Admin API cookbook (preferred over Atlas)](#21-admin-api-cookbook-preferred-over-atlas)
+22. [Vendor / customer APIs that write the same collections](#22-vendor--customer-apis-that-write-the-same-collections)
 
 ---
 
@@ -547,6 +553,247 @@ How to tell which DB you are in: Atlas Data Explorer shows the database name; Re
 
 ---
 
+## 17. Compass and mongosh (optional)
+
+### MongoDB Compass (desktop)
+
+1. Install Compass from mongodb.com/compass.
+2. Render → **dailycart-api** → Environment → copy **`MONGO_URL`** (do not paste it into git/chat).
+3. Compass → New connection → paste URI → Connect.
+4. Left tree: **`dailycart`** → collections.
+5. Same Filter JSON as Data Explorer.
+
+If Compass cannot connect: Atlas → **Network Access** must allow your home IP (or `0.0.0.0/0`). Render already connects from its own IPs.
+
+### mongosh
+
+```text
+mongosh "<MONGO_URL-from-Render>"
+use dailycart
+db.users.find({ email: "admin@dailycart.in" })
+```
+
+---
+
+## 18. Atlas website login vs database user
+
+| Login | What it is | Where |
+|-------|------------|--------|
+| **Atlas account** | Your Google/email for the cloud console | https://cloud.mongodb.com — org **mohan's Org**, project **Project 0** |
+| **Database user** | Username/password inside `MONGO_URL` | Atlas → **Database & Network Access** → Database Users. Used only by FastAPI (and Compass). |
+
+You can be logged into Atlas and still fail Compass if the DB user password is wrong. Reset that user in Database Access, then update Render `MONGO_URL` and **Manual Deploy** `dailycart-api`. Do not commit the new URI.
+
+---
+
+## 19. Seeded cities and categories (exact lists)
+
+### `cities` (picker + default pins)
+
+| name | state | lat | lng |
+|------|-------|-----|-----|
+| Hyderabad | Telangana | 17.3850 | 78.4867 |
+| Bangalore | Karnataka | 12.9716 | 77.5946 |
+| Visakhapatnam | Andhra Pradesh | 17.6868 | 83.2185 |
+| Bhimavaram | Andhra Pradesh | 16.5449 | 81.5212 |
+| Pune | Maharashtra | 18.5204 | 73.8567 |
+| Delhi | Delhi | 28.6139 | 77.2090 |
+| Mumbai | Maharashtra | 19.0760 | 72.8777 |
+| Chennai | Tamil Nadu | 13.0827 | 80.2707 |
+
+Insert a city (Atlas `cities`):
+
+```json
+{
+  "id": "<new-uuid>",
+  "name": "Vijayawada",
+  "state": "Andhra Pradesh",
+  "lat": 16.5062,
+  "lng": 80.6480
+}
+```
+
+Then add **approved + active** vendors whose `location.coordinates` are `[lng, lat]` near that pin, or Home stays empty.
+
+### `categories`
+
+**Products (`kind: product`):** grocery, dairy, fruits-veg, snacks, household, pooja, stationery, frozen, baby-pet.
+
+**Services (`kind: service`):** plumber, electrician, cleaning, ac-repair, beauty, appliance, ironing, cobbler, tailor, tiffin, pest, ro-water, kitchen-repair, cctv, car-wash, movers, carpenter, pooja-service.
+
+Vendor `category_slugs` and product/service `category_slug` must match these `slug` values. Insert:
+
+```json
+{
+  "id": "<new-uuid>",
+  "slug": "pharmacy",
+  "name": "Pharmacy",
+  "kind": "product",
+  "icon": "heart-pulse"
+}
+```
+
+---
+
+## 20. Example documents (shape the API writes)
+
+### User
+
+```json
+{
+  "id": "uuid",
+  "name": "Ops Admin",
+  "email": "admin@dailycart.in",
+  "phone": "9999900099",
+  "password_hash": "$2b$12$…",
+  "capabilities": ["admin", "customer"],
+  "is_active": true,
+  "created_at": "2026-08-21T00:00:00+00:00"
+}
+```
+
+### Mart vendor (geo)
+
+```json
+{
+  "id": "uuid",
+  "user_id": "owner-user-uuid",
+  "type": "mart",
+  "name": "Store name",
+  "city": "Bangalore",
+  "location": { "type": "Point", "coordinates": [77.5946, 12.9716] },
+  "kyc_status": "approved",
+  "kyc": { "id_type": "gstin", "id_number": "…", "submitted_at": "…", "decided_at": "…" },
+  "is_active": true,
+  "is_open": true,
+  "min_order": 99,
+  "delivery_fee": 25,
+  "category_slugs": ["grocery", "dairy"]
+}
+```
+
+### Product
+
+```json
+{
+  "id": "uuid",
+  "vendor_id": "vendor-uuid",
+  "name": "Toor Dal",
+  "category_slug": "grocery",
+  "price": 149,
+  "mrp": 165,
+  "unit": "1 kg",
+  "stock_qty": 40,
+  "is_available": true
+}
+```
+
+### Order (status machine)
+
+`status` one of: `placed`, `accepted`, `picking`, `ready`, `out_for_delivery`, `delivered`, `cancelled`, `rejected`.
+
+`items[]`: `{ "product_id", "name", "price", "qty", "unit", "image" }`.
+
+`payment_method`: `cod` | `razorpay`. `payment_status`: `pending` | `paid`.
+
+### Booking
+
+`status` one of: `requested`, `accepted`, `en_route`, `in_progress`, `completed`, `cancelled`, `declined`.
+
+`slot_date` + `slot_time` unique per vendor except cancelled/declined/completed.
+
+### Review / dispute
+
+Review: `rating` 1–5, exactly one of `order_id` or `booking_id`. Recalculates `vendors.rating` and `review_count`.
+
+Dispute: `status` `open` | `resolved`; admin sets `resolution`, `resolved_at`.
+
+### Payment intent
+
+`purpose` grocery checkout or booking; `status` `created` then `paid`; unique `id`; stores `razorpay_order_id`. Do not edit unless recovering a stuck pay.
+
+---
+
+## 21. Admin API cookbook (preferred over Atlas)
+
+Base: `https://dailycart-api.onrender.com/api`  
+Header: `Authorization: Bearer <dc_token from /admin/login>`  
+Content-Type: `application/json`
+
+Login (no Bearer):
+
+```http
+POST /api/auth/login
+{ "email": "admin@dailycart.in", "password": "<your-admin-password>" }
+```
+
+Response includes `token` and `user.capabilities`.
+
+| Task | Method | Path | Body |
+|------|--------|------|------|
+| List users | GET | `/admin/users` | |
+| Edit contact | PATCH | `/admin/users/{id}` | `{ "name", "email", "phone" }` |
+| Reset password | PATCH | `/admin/users/{id}/password` | `{ "password": "min6chars" }` |
+| Make admin | PATCH | `/admin/users/{id}/admin` | `{ "is_admin": true }` |
+| Remove admin | PATCH | `/admin/users/{id}/admin` | `{ "is_admin": false }` |
+| Deactivate user | DELETE | `/admin/users/{id}` | |
+| KYC decide | POST | `/admin/kyc/{vendor_id}/decide` | `{ "decision": "approved"\|"rejected", "note": "…" }` |
+| Edit vendor / move pin | PATCH | `/admin/vendors/{id}` | `{ "city", "lat", "lng", "address", "min_order", "delivery_fee", "is_open", "category_slugs" }` |
+| Hide / show vendor | PATCH | `/admin/vendors/{id}/active` | `{ "is_active": false }` |
+| Add product | POST | `/admin/vendors/{id}/products` | `{ "name", "category_slug", "price", "mrp", "unit", "stock_qty", "is_available": true }` |
+| Edit product | PATCH | `/admin/vendors/{id}/products/{pid}` | same as add |
+| Delete product | DELETE | `/admin/vendors/{id}/products/{pid}` | |
+| Add / edit / delete service | POST/PATCH/DELETE | `/admin/vendors/{id}/services` … | `{ "name", "category_slug", "base_price", "duration_minutes", "is_available" }` |
+| Order step | PATCH | `/admin/orders/{id}/status` | `{ "status": "accepted" }` (one step only) |
+| Booking step | PATCH | `/admin/bookings/{id}/status` | `{ "status": "accepted" }` |
+| Resolve dispute | PATCH | `/admin/disputes/{id}/resolve` | `{ "resolution": "…" }` |
+
+Interactive: https://dailycart-api.onrender.com/docs — **Authorize** with Bearer token.
+
+Admin UI map:
+
+| Screen | URL |
+|--------|-----|
+| Dashboard | `/admin` |
+| KYC | `/admin/kyc` |
+| Vendors + geo | `/admin/vendors` |
+| Catalog | `/admin/vendors/:vendorId/catalog` |
+| Users, password, make-admin | `/admin/users` |
+| Orders | `/admin/orders` |
+| Bookings | `/admin/bookings` |
+| Disputes | `/admin/disputes` |
+
+There is **no** Admin screen for `cities` or `categories` yet — use Atlas (section 19).
+
+PowerShell example (password reset):
+
+```powershell
+$token = "<paste-token>"
+$id = "<user-uuid>"
+Invoke-RestMethod -Method PATCH -Uri "https://dailycart-api.onrender.com/api/admin/users/$id/password" -Headers @{ Authorization = "Bearer $token" } -ContentType "application/json" -Body '{"password":"NewPass@123"}'
+```
+
+---
+
+## 22. Vendor / customer APIs that write the same collections
+
+| Actor | Writes |
+|-------|--------|
+| `POST /api/auth/register` | `users` (`capabilities: ["customer"]` only) |
+| `POST /api/vendor/onboarding` | `vendors` (kyc pending) + products/services + `users.capabilities` `mart_vendor` or `service_vendor` |
+| `PATCH /api/vendor/products/{id}` | `products` (owner’s catalog) |
+| `PATCH /api/vendor/orders/{id}/status` | same `apply_order_status` as admin |
+| `POST /api/orders/checkout` | `orders` + decrement `products.stock_qty` |
+| `POST /api/bookings` | `bookings` |
+| `POST /api/payments/razorpay/create` | `payment_intents` |
+| `POST /api/payments/razorpay/confirm` | marks intent paid, creates order/booking |
+| `POST /api/reviews` | `reviews` + vendor rating |
+| `POST /api/disputes` | `disputes` |
+
+Public discovery (`GET /api/discovery`) **never** returns `kyc`, `kyc_status`, or `user_id` (`public_vendor()`).
+
+---
+
 ## Related docs
 
 | Doc | Use |
@@ -555,4 +802,5 @@ How to tell which DB you are in: Atlas Data Explorer shows the database name; Re
 | [`DEPLOY_RENDER.md`](DEPLOY_RENDER.md) | First-time Render + Atlas wiring |
 | API | https://dailycart-api.onrender.com/docs |
 | Atlas | https://cloud.mongodb.com → Data Explorer → Cluster0 → `dailycart` |
+| Atlas DB users | https://cloud.mongodb.com → Database & Network Access |
 | Admin | https://dailycartindia.com/admin |

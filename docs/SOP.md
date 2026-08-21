@@ -558,20 +558,60 @@ Related: `docs/DEPLOY_RENDER.md` (first-time hosting), `docs/SOP_DATABASE.md` (s
 
 ## 16. Database — read and update live data
 
-**Full technical SOP:** [`docs/SOP_DATABASE.md`](SOP_DATABASE.md)
+**Canonical full SOP (every collection, recipe, curl, Compass):** [`docs/SOP_DATABASE.md`](SOP_DATABASE.md)
 
-Short version:
+That file now has all of it:
 
-1. Open https://cloud.mongodb.com → **Data Explorer** → **Cluster0** → database **`dailycart`**.
-2. The shop never talks to Mongo. Only `dailycart-api` does (`MONGO_URL` + `DB_NAME=dailycart` on Render).
-3. Every record the API uses has a UUID field named **`id`**. Do not update by Mongo `_id`.
-4. **Prefer Admin** (https://dailycartindia.com/admin) for passwords, make-admin, KYC, catalog, order status. Atlas is for geo, cities, bulk hide, and stuck documents.
-5. After an Atlas edit: no deploy is required. Hard-refresh the shop. Login again if you changed `capabilities` or password.
-6. Never run `python seed.py --force` against this cluster.
+1. Code vs data updates  
+2. How FastAPI connects (`MONGO_URL`, `DB_NAME=dailycart`, Motor)  
+3. Open Atlas Data Explorer  
+4. Hard rules  
+5. UUID `id` vs Mongo `_id`  
+6. Every collection and field  
+7. What queries the API actually runs  
+8. Admin UI first  
+9. Atlas Filter + Update recipes  
+10. Passwords (bcrypt) and make-admin  
+11. Order / booking status machines  
+12. Geo `[lng, lat]`, empty Home  
+13. Indexes  
+14. Seed / backups (`--force` wipes production)  
+15. Local vs production  
+16. Post-edit checklist  
+17. Compass and mongosh  
+18. Atlas website login vs database user  
+19. Exact city and category lists  
+20. Example documents  
+21. Admin API cookbook  
+22. Customer/vendor APIs that write the same data  
 
-Common Atlas update (example — hide a store):
+### Decision: how to change live data
+
+| Change | Do this | Deploy? |
+|--------|---------|---------|
+| Price, stock, hide store, KYC, password, make-admin, move pin, order step | **Admin** https://dailycartindia.com/admin | No |
+| Same, from a script | **Admin API** Bearer token, see cookbook in SOP_DATABASE §21 | No |
+| Add a **city** or **category** (no Admin screen yet) | Atlas `cities` / `categories` | No |
+| New endpoint or new rule | Git `main` → Manual Deploy `dailycart-api` | Yes |
+| Legal page / WhatsApp / UI | Git `main` → Manual Deploy `dailycartindia-web` | Yes |
+
+### Open the database
+
+1. Atlas account: https://cloud.mongodb.com (org **mohan's Org**, project **Project 0**).  
+2. **Data Explorer** → **Cluster0** → **`dailycart`**.  
+3. Database user (API/Compass): Atlas → **Database & Network Access**. URI is Render → `dailycart-api` → `MONGO_URL`. Never paste it into git.
+
+Filter every edit on **`id`** (UUID), not `_id`.
 
 ```json
 Filter:  { "id": "<vendor-uuid>" }
 Update:  { "$set": { "is_active": false } }
 ```
+
+Admin password / make-admin (no Atlas):
+
+- UI: `/admin/users`  
+- API: `PATCH /api/admin/users/{id}/password` `{ "password": "…" }`  
+- API: `PATCH /api/admin/users/{id}/admin` `{ "is_admin": true }`
+
+Never put plaintext in `password_hash`. Never `seed.py --force` on Cluster0. Never skip `placed` → `delivered` in Mongo.
