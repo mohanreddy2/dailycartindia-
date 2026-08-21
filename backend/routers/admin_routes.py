@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, Field
 
 from core import db, hash_password, new_id, now_iso, strip_id, require_admin, apply_order_status, apply_booking_status
+from routers.vendor_routes import ProductBody, ServiceBody, validate_inline_image
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -193,6 +194,87 @@ async def update_vendor(vendor_id: str, body: AdminVendorUpdate, admin: dict = D
         await db.audit_log.insert_one({"id": new_id(), "action": "vendor_updated", "vendor_id": vendor_id,
                                        "by": admin["id"], "at": now_iso()})
     return strip_id(await db.vendors.find_one({"id": vendor_id}))
+
+
+async def _require_vendor(vendor_id: str) -> dict:
+    vendor = await db.vendors.find_one({"id": vendor_id})
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    return vendor
+
+
+@router.post("/vendors/{vendor_id}/products")
+async def admin_add_product(vendor_id: str, body: ProductBody, admin: dict = Depends(require_admin)):
+    vendor = await _require_vendor(vendor_id)
+    if vendor["type"] != "mart":
+        raise HTTPException(status_code=400, detail="Only kirana / mart stores have products")
+    validate_inline_image(body.image)
+    product = {"id": new_id(), "vendor_id": vendor_id, **body.model_dump(), "created_at": now_iso()}
+    await db.products.insert_one(dict(product))
+    await db.audit_log.insert_one({"id": new_id(), "action": "admin_product_created", "vendor_id": vendor_id,
+                                   "product_id": product["id"], "by": admin["id"], "at": now_iso()})
+    return strip_id(product)
+
+
+@router.patch("/vendors/{vendor_id}/products/{product_id}")
+async def admin_update_product(vendor_id: str, product_id: str, body: ProductBody, admin: dict = Depends(require_admin)):
+    await _require_vendor(vendor_id)
+    product = await db.products.find_one({"id": product_id, "vendor_id": vendor_id})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    validate_inline_image(body.image)
+    await db.products.update_one({"id": product_id}, {"$set": body.model_dump()})
+    await db.audit_log.insert_one({"id": new_id(), "action": "admin_product_updated", "vendor_id": vendor_id,
+                                   "product_id": product_id, "by": admin["id"], "at": now_iso()})
+    return strip_id(await db.products.find_one({"id": product_id}))
+
+
+@router.delete("/vendors/{vendor_id}/products/{product_id}")
+async def admin_delete_product(vendor_id: str, product_id: str, admin: dict = Depends(require_admin)):
+    await _require_vendor(vendor_id)
+    result = await db.products.delete_one({"id": product_id, "vendor_id": vendor_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Product not found")
+    await db.audit_log.insert_one({"id": new_id(), "action": "admin_product_deleted", "vendor_id": vendor_id,
+                                   "product_id": product_id, "by": admin["id"], "at": now_iso()})
+    return {"ok": True}
+
+
+@router.post("/vendors/{vendor_id}/services")
+async def admin_add_service(vendor_id: str, body: ServiceBody, admin: dict = Depends(require_admin)):
+    vendor = await _require_vendor(vendor_id)
+    if vendor["type"] != "service":
+        raise HTTPException(status_code=400, detail="Only service professionals have services")
+    validate_inline_image(body.image)
+    svc = {"id": new_id(), "vendor_id": vendor_id, **body.model_dump(), "created_at": now_iso()}
+    await db.services.insert_one(dict(svc))
+    await db.audit_log.insert_one({"id": new_id(), "action": "admin_service_created", "vendor_id": vendor_id,
+                                   "service_id": svc["id"], "by": admin["id"], "at": now_iso()})
+    return strip_id(svc)
+
+
+@router.patch("/vendors/{vendor_id}/services/{service_id}")
+async def admin_update_service(vendor_id: str, service_id: str, body: ServiceBody, admin: dict = Depends(require_admin)):
+    await _require_vendor(vendor_id)
+    svc = await db.services.find_one({"id": service_id, "vendor_id": vendor_id})
+    if not svc:
+        raise HTTPException(status_code=404, detail="Service not found")
+    validate_inline_image(body.image)
+    await db.services.update_one({"id": service_id}, {"$set": body.model_dump()})
+    await db.audit_log.insert_one({"id": new_id(), "action": "admin_service_updated", "vendor_id": vendor_id,
+                                   "service_id": service_id, "by": admin["id"], "at": now_iso()})
+    return strip_id(await db.services.find_one({"id": service_id}))
+
+
+@router.delete("/vendors/{vendor_id}/services/{service_id}")
+async def admin_delete_service(vendor_id: str, service_id: str, admin: dict = Depends(require_admin)):
+    await _require_vendor(vendor_id)
+    result = await db.services.delete_one({"id": service_id, "vendor_id": vendor_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Service not found")
+    await db.audit_log.insert_one({"id": new_id(), "action": "admin_service_deleted", "vendor_id": vendor_id,
+                                   "service_id": service_id, "by": admin["id"], "at": now_iso()})
+    return {"ok": True}
 
 
 @router.patch("/vendors/{vendor_id}/active")

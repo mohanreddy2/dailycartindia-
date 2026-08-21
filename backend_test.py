@@ -729,6 +729,39 @@ class DailyCartTester:
                     data={"status": "accepted"}
                 )
 
+            success, vendors = self.test(
+                "Admin List Vendors",
+                "GET", "admin/vendors", 200,
+                token=self.admin_token
+            )
+            mart = next((v for v in (vendors or []) if isinstance(v, dict) and v.get("type") == "mart"), None)
+            if mart:
+                success, product = self.test(
+                    "Admin add product to mart",
+                    "POST", f"admin/vendors/{mart['id']}/products", 200,
+                    token=self.admin_token,
+                    data={"name": "Ops test rice", "category_slug": "grocery", "price": 50, "unit": "1 kg", "stock_qty": 10, "is_available": True}
+                )
+                if success and isinstance(product, dict) and product.get("id"):
+                    self.test(
+                        "Admin update product",
+                        "PATCH", f"admin/vendors/{mart['id']}/products/{product['id']}", 200,
+                        token=self.admin_token,
+                        data={"name": "Ops test rice", "category_slug": "grocery", "price": 55, "unit": "1 kg", "stock_qty": 8, "is_available": True}
+                    )
+                    self.test(
+                        "Admin delete product",
+                        "DELETE", f"admin/vendors/{mart['id']}/products/{product['id']}", 200,
+                        token=self.admin_token
+                    )
+            if self.customer_token and mart:
+                self.test(
+                    "Customer cannot edit admin catalog",
+                    "POST", f"admin/vendors/{mart['id']}/products", 403,
+                    token=self.customer_token,
+                    data={"name": "Nope", "category_slug": "grocery", "price": 1, "unit": "1 pc", "stock_qty": 1, "is_available": True}
+                )
+
         # Print Summary
         self.print_summary()
 

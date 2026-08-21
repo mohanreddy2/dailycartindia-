@@ -142,9 +142,9 @@ Discovery only returns vendors with `kyc_status=approved` and `is_active=true`. 
 | **Customer** | Register, shop, book, COD checkout, cancel early, review after done, open a dispute | Become admin; see another user’s orders |
 | **Mart vendor** | Inventory CRUD, accept/advance/reject grocery orders, earnings | Approve own KYC; change another store |
 | **Service vendor** | Services CRUD, availability, accept/advance/decline jobs | Same as above |
-| **Admin** | KYC approve/reject, create/edit/deactivate vendors and users, **process grocery orders and service bookings** (accept → complete/deliver or reject) | Reset passwords; promote a user to admin; change catalog prices (that is the vendor) |
+| **Admin** | KYC, vendors, users, process orders/bookings, **add/edit/delete a partner’s products or services** | Reset passwords; promote a user to admin |
 
-Catalog photos, prices, and stock are changed by the **vendor** on `/vendor`. Legal pages (`/privacy`, `/terms`, `/refund`, `/partner`) are code — change them in git, then redeploy **`dailycartindia-web`**.
+Catalog photos, prices, and stock can be changed by the **vendor** on `/vendor` **or by ops** on `/admin/vendors` → catalog (boxes icon). Legal pages (`/privacy`, `/terms`, `/refund`, `/partner`) are code — change them in git, then redeploy **`dailycartindia-web`**.
 
 ---
 
@@ -293,7 +293,7 @@ If you previously used `/auth` as a customer, **logout first** or you will see A
 |--------|------|------------|
 | Dashboard | `/admin` | Users, live vendors, pending KYC, active orders/bookings, open disputes, GMV (delivered orders + completed bookings) |
 | KYC | `/admin/kyc` | Filter pending / approved / rejected. Open a row → Approve or Reject with a note. This is the gate that puts a partner on the public map. |
-| Vendors | `/admin/vendors` | List, create, edit name/address/geo/fees, toggle **active**. Deactivating hides them from discovery and blocks checkout. |
+| Vendors | `/admin/vendors` | List, create, edit name/address/geo/fees, toggle **active**. Boxes icon → **catalog** (add/edit/delete products or services). |
 | Users | `/admin/users` | Create customer (name, email, password, phone). Edit name/email/phone. Deactivate (soft delete; also deactivates their vendor). Cannot reset password or grant admin. |
 | Orders | `/admin/orders` | Watch **and process** grocery orders: Accept → picking → ready → out for delivery → delivered. Reject only while `placed`. Same rules as the store. |
 | Bookings | `/admin/bookings` | Watch **and process** jobs: Accept → start travel → begin work → completed. **Reject** only while `requested` (status becomes `declined`). Same rules as the pro. |

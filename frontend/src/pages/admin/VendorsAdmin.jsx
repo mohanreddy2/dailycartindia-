@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -9,9 +10,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { api, errMsg } from '../../lib/api';
 import { toast } from 'sonner';
 import { EmptyState, RowSkeletons, StatusBadge, RatingPill } from '../../components/shared/bits';
-import { Pencil, Plus, Store } from 'lucide-react';
+import { Pencil, Plus, Store, Boxes } from 'lucide-react';
 
 export default function VendorsAdmin() {
+  const navigate = useNavigate();
   const [vendors, setVendors] = useState(null);
   const [users, setUsers] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -71,7 +73,7 @@ export default function VendorsAdmin() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <div><h1 className="font-display text-xl font-bold">Vendors</h1><p className="text-sm text-muted-foreground">Review submitted business details, edit profiles, or deactivate listings.</p></div>
+        <div><h1 className="font-display text-xl font-bold">Vendors</h1><p className="text-sm text-muted-foreground">Add partners, edit profiles, manage products or services, and deactivate listings.</p></div>
         <Button data-testid="admin-vendor-add-button" size="sm" className="gap-1" onClick={openCreate}><Plus className="h-4 w-4" /> Add vendor</Button>
       </div>
       {!vendors ? <RowSkeletons /> : vendors.length === 0 ? (
@@ -105,6 +107,9 @@ export default function VendorsAdmin() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <Button size="icon" variant="ghost" title={v.type === 'mart' ? 'Edit products' : 'Edit services'} onClick={() => navigate(`/admin/vendors/${v.id}/catalog`)}>
+                        <Boxes className="h-4 w-4" />
+                      </Button>
                       <Button size="icon" variant="ghost" title="View or edit vendor" disabled={busyId === v.id} onClick={() => openEdit(v)}><Pencil className="h-4 w-4" /></Button>
                       <Button data-testid="admin-vendor-toggle-button" size="sm" variant={v.is_active ? 'outline' : 'default'}
                         className={v.is_active ? 'text-destructive' : ''} disabled={busyId === v.id} onClick={() => toggle(v)}>
@@ -138,6 +143,9 @@ export default function VendorsAdmin() {
                   <div className="rounded-md border p-2"><p className="mb-1 font-medium">Products ({selected.products?.length || 0})</p>{selected.products?.slice(0, 4).map((item) => <p key={item.id} className="truncate text-muted-foreground">{item.name}</p>) || null}</div>
                   <div className="rounded-md border p-2"><p className="mb-1 font-medium">Services ({selected.services?.length || 0})</p>{selected.services?.slice(0, 4).map((item) => <p key={item.id} className="truncate text-muted-foreground">{item.name}</p>) || null}</div>
                 </div>
+                <Button type="button" variant="outline" className="w-full gap-1" onClick={() => { setForm(null); navigate(`/admin/vendors/${selected.id}/catalog`); }}>
+                  <Boxes className="h-4 w-4" /> {selected.type === 'mart' ? 'Edit products' : 'Edit services'}
+                </Button>
               </>}
               <div className="space-y-1"><Label htmlFor="vendor-name">Business name</Label><Input id="vendor-name" required value={form.name} onChange={(e) => change('name', e.target.value)} /></div>
               <div className="space-y-1"><Label htmlFor="vendor-description">Description</Label><Textarea id="vendor-description" value={form.description} onChange={(e) => change('description', e.target.value)} /></div>

@@ -39,6 +39,7 @@ import VendorsAdmin from './pages/admin/VendorsAdmin';
 import UsersAdmin from './pages/admin/UsersAdmin';
 import { OrdersAdmin, BookingsAdmin } from './pages/admin/OrdersAdmin';
 import DisputesAdmin from './pages/admin/DisputesAdmin';
+import VendorCatalogAdmin from './pages/admin/VendorCatalogAdmin';
 
 function App() {
   return (
@@ -86,6 +87,7 @@ function App() {
                 <Route index element={<AdminDashboard />} />
                 <Route path="kyc" element={<KycQueue />} />
                 <Route path="vendors" element={<VendorsAdmin />} />
+                <Route path="vendors/:vendorId/catalog" element={<VendorCatalogAdmin />} />
                 <Route path="users" element={<UsersAdmin />} />
                 <Route path="orders" element={<OrdersAdmin />} />
                 <Route path="bookings" element={<BookingsAdmin />} />
