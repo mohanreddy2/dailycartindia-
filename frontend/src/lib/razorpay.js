@@ -25,14 +25,19 @@ export function openRazorpayCheckout(session) {
       reject(new Error('Could not load Razorpay. Check your network and try again.'));
       return;
     }
+    const prefill = { ...(session.prefill || {}) };
+    const digits = String(prefill.contact || '').replace(/\D/g, '');
+    const local = digits.length === 12 && digits.startsWith('91') ? digits.slice(2) : digits;
+    if (local.length === 10) prefill.contact = local;
+    else delete prefill.contact;
+
     const rzp = new window.Razorpay({
       key: session.key_id,
-      amount: session.amount,
       currency: session.currency || 'INR',
-      name: session.name || 'DailyCart',
+      name: session.name || 'Daily Cart',
       description: session.description || 'Payment',
       order_id: session.order_id,
-      prefill: session.prefill || {},
+      prefill,
       theme: { color: '#0F766E' },
       handler(response) {
         resolve({

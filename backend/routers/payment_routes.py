@@ -25,6 +25,18 @@ from routers.customer_routes import (
 router = APIRouter(prefix="/payments", tags=["payments"])
 
 
+def _india_mobile(phone: Optional[str]) -> str:
+    """Razorpay checkout prefill only accepts a 10-digit Indian mobile."""
+    if not phone:
+        return ""
+    digits = "".join(ch for ch in str(phone) if ch.isdigit())
+    if len(digits) == 12 and digits.startswith("91"):
+        digits = digits[2:]
+    if len(digits) == 11 and digits.startswith("0"):
+        digits = digits[1:]
+    return digits if len(digits) == 10 else ""
+
+
 class CheckoutIntentBody(BaseModel):
     items: List[CartItem]
     address: Address
@@ -108,7 +120,7 @@ async def create_payment(body: CreatePaymentBody, user: dict = Depends(get_curre
         "prefill": {
             "name": user.get("name") or "",
             "email": user.get("email") or "",
-            "contact": user.get("phone") or "",
+            "contact": _india_mobile(user.get("phone")),
         },
     }
 
