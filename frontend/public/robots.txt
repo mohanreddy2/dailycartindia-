@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin/
+Disallow: /vendor
+Disallow: /vendor/
+
+Sitemap: https://dailycartindia.com/sitemap.xml

@@ -9,7 +9,8 @@ DailyCart is one React app with three routes, not three separate frontend deploy
 The included `render.yaml` creates:
 
 - `dailycart-api`: FastAPI backend
-- `dailycart-web`: React static site
+
+The live shop is a **separate** Render static service named **`dailycartindia-web`** (not Blueprint). After frontend changes, open that service → **Manual Deploy → Deploy latest commit**. Do not create another static service named `dailycart-web`.
 
 ## 1. Create a MongoDB Atlas free database
 
@@ -36,7 +37,7 @@ mongodb+srv://<username>:<password>@<cluster-url>/dailycart?retryWrites=true&w=m
 https://dailycart-api.onrender.com
 ```
 
-6. Set `REACT_APP_BACKEND_URL` on the `dailycart-web` service to that API URL (without `/api`) and redeploy the static site.
+6. Set `REACT_APP_BACKEND_URL` on the **`dailycartindia-web`** static service to that API URL (without `/api`) and Manual Deploy the static site.
 7. Copy the static site's public URL and add it to `CORS_ORIGINS` on `dailycart-api`, alongside the two production domains:
 
 ```text
@@ -64,7 +65,7 @@ Checkout and service booking support **Cash on delivery** plus **Razorpay** (UPI
 | `RAZORPAY_KEY_ID` | `rzp_test_...` or `rzp_live_...` |
 | `RAZORPAY_KEY_SECRET` | matching secret (never commit this) |
 
-3. **Manual Deploy** `dailycart-api`, then **Manual Deploy** `dailycart-web` (so the updated checkout UI is live).
+3. **Manual Deploy** `dailycart-api`, then **Manual Deploy** `dailycartindia-web` (so the updated checkout UI is live).
 4. Confirm online pay is on:
 
 ```text
@@ -77,7 +78,7 @@ Test cards (test mode): use Razorpay’s documented test card numbers from their
 
 ## 4. Connect `dailycartindia.com` in Squarespace
 
-1. In Render's `dailycart-web` service, add the custom domains:
+1. In Render's **`dailycartindia-web`** service, add the custom domains:
    - `dailycartindia.com`
    - `www.dailycartindia.com`
 2. Render displays the exact DNS records to add.

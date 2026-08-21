@@ -47,6 +47,8 @@ Use this document to run the live shop, onboard partners, fulfill orders, take p
 | API | https://dailycart-api.onrender.com |
 | Health check | https://dailycart-api.onrender.com/api/health |
 | Payment flags | https://dailycart-api.onrender.com/api/payments/methods |
+| robots.txt | https://dailycartindia.com/robots.txt |
+| Sitemap | https://dailycartindia.com/sitemap.xml |
 | API docs | https://dailycart-api.onrender.com/docs |
 
 One React app serves **three portals**. There is not a separate website per role.
@@ -57,7 +59,6 @@ One React app serves **three portals**. There is not a separate website per role
 |---------|------|------|------|
 | **`dailycart-api`** | Python web | FastAPI | Blueprint-managed. Free plan **sleeps**; first request can take ~50 seconds. |
 | **`dailycartindia-web`** | Static | **Live shop** | Auto-deploy from GitHub is unreliable. After every frontend change: **Manual Deploy → Deploy latest commit**. |
-| `dailycart-web` | Static | Leftover | Named in `render.yaml`. Often Failed. **Do not** point DNS here. |
 
 DNS (Squarespace): `www` CNAME → `dailycartindia-web.onrender.com`; apex A `216.24.57.1` (confirm in Render if it changes).
 
@@ -142,7 +143,7 @@ Discovery only returns vendors with `kyc_status=approved` and `is_active=true`. 
 | **Customer** | Register, shop, book, COD checkout, cancel early, review after done, open a dispute | Become admin; see another user’s orders |
 | **Mart vendor** | Inventory CRUD, accept/advance/reject grocery orders, earnings | Approve own KYC; change another store |
 | **Service vendor** | Services CRUD, availability, accept/advance/decline jobs | Same as above |
-| **Admin** | KYC, vendors, users, process orders/bookings, **add/edit/delete a partner’s products or services** | Reset passwords; promote a user to admin |
+| **Admin** | KYC, vendors, users, process orders/bookings, **catalog CRUD**, **reset passwords**, **make admin** | Remove your own admin access; skip order/booking steps |
 
 Catalog photos, prices, and stock can be changed by the **vendor** on `/vendor` **or by ops** on `/admin/vendors` → catalog (boxes icon). Legal pages (`/privacy`, `/terms`, `/refund`, `/partner`) are code — change them in git, then redeploy **`dailycartindia-web`**.
 
@@ -294,7 +295,7 @@ If you previously used `/auth` as a customer, **logout first** or you will see A
 | Dashboard | `/admin` | Users, live vendors, pending KYC, active orders/bookings, open disputes, GMV (delivered orders + completed bookings) |
 | KYC | `/admin/kyc` | Filter pending / approved / rejected. Open a row → Approve or Reject with a note. This is the gate that puts a partner on the public map. |
 | Vendors | `/admin/vendors` | List, create, edit name/address/geo/fees, toggle **active**. Boxes icon → **catalog** (add/edit/delete products or services). |
-| Users | `/admin/users` | Create customer (name, email, password, phone). Edit name/email/phone. Deactivate (soft delete; also deactivates their vendor). Cannot reset password or grant admin. |
+| Users | `/admin/users` | Create customer (name, email, password, phone). Edit name/email/phone. **Reset password** (optional new password on edit). **Make admin** / remove admin (shield icon). Deactivate (soft delete; also deactivates their vendor). |
 | Orders | `/admin/orders` | Watch **and process** grocery orders: Accept → picking → ready → out for delivery → delivered. Reject only while `placed`. Same rules as the store. |
 | Bookings | `/admin/bookings` | Watch **and process** jobs: Accept → start travel → begin work → completed. **Reject** only while `requested` (status becomes `declined`). Same rules as the pro. |
 | Disputes | `/admin/disputes` | Open disputes from customers. Write a resolution → mark resolved. |
@@ -327,8 +328,7 @@ If you previously used `/auth` as a customer, **logout first** or you will see A
 
 **What admin cannot do (do not look for these buttons)**
 
-- Reset a password
-- Make another user an admin
+- Remove **your own** admin access or delete your own admin account
 - Skip order or booking steps (orders: placed → accepted → picking → ready → out_for_delivery → delivered; bookings: requested → accepted → en_route → in_progress → completed)
 - Refund Razorpay (do that in the Razorpay Dashboard, and only after live capture works)
 

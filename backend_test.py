@@ -762,6 +762,33 @@ class DailyCartTester:
                     data={"name": "Nope", "category_slug": "grocery", "price": 1, "unit": "1 pc", "stock_qty": 1, "is_available": True}
                 )
 
+            if self.customer_token and self.test_data.get("customer_id"):
+                cid = self.test_data["customer_id"]
+                self.test(
+                    "Admin reset user password",
+                    "PATCH", f"admin/users/{cid}/password", 200,
+                    token=self.admin_token,
+                    data={"password": "Demo@123"}
+                )
+                self.test(
+                    "Admin grant admin role",
+                    "PATCH", f"admin/users/{cid}/admin", 200,
+                    token=self.admin_token,
+                    data={"is_admin": True}
+                )
+                self.test(
+                    "Admin revoke admin role",
+                    "PATCH", f"admin/users/{cid}/admin", 200,
+                    token=self.admin_token,
+                    data={"is_admin": False}
+                )
+                self.test(
+                    "Customer cannot grant admin",
+                    "PATCH", f"admin/users/{cid}/admin", 403,
+                    token=self.customer_token,
+                    data={"is_admin": True}
+                )
+
         # Print Summary
         self.print_summary()
 

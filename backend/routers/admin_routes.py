@@ -40,6 +40,14 @@ class AdminUserUpdate(BaseModel):
     phone: Optional[str] = None
 
 
+class AdminPasswordBody(BaseModel):
+    password: str = Field(..., min_length=6)
+
+
+class AdminRoleBody(BaseModel):
+    is_admin: bool
+
+
 class AdminVendorCreate(BaseModel):
     user_id: str
     type: str = Field(..., pattern="^(mart|service)$")
@@ -344,6 +352,37 @@ async def update_user(user_id: str, body: AdminUserUpdate, admin: dict = Depends
         await db.users.update_one({"id": user_id}, {"$set": updates})
         await db.audit_log.insert_one({"id": new_id(), "action": "user_updated", "user_id": user_id,
                                        "by": admin["id"], "at": now_iso()})
+    return public_user(await db.users.find_one({"id": user_id}))
+
+
+@router.patch("/users/{user_id}/password")
+async def reset_user_password(user_id: str, body: AdminPasswordBody, admin: dict = Depends(require_admin)):
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.get("is_active", True) is False:
+        raise HTTPException(status_code=400, detail="Reactivate this account before resetting the password")
+    await db.users.update_one({"id": user_id}, {"$set": {"password_hash": hash_password(body.password)}})
+    await db.audit_log.insert_one({"id": new_id(), "action": "admin_password_reset", "user_id": user_id,
+                                   "by": admin["id"], "at": now_iso()})
+    return {"ok": True}
+
+
+@router.patch("/users/{user_id}/admin")
+async def set_user_admin(user_id: str, body: AdminRoleBody, admin: dict = Depends(require_admin)):
+    if user_id == admin["id"] and not body.is_admin:
+        raise HTTPException(status_code=400, detail="You cannot remove your own admin access")
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.get("is_active", True) is False:
+        raise HTTPException(status_code=400, detail="This account has been removed")
+    if body.is_admin:
+        await db.users.update_one({"id": user_id}, {"$addToSet": {"capabilities": "admin"}})
+    else:
+        await db.users.update_one({"id": user_id}, {"$pull": {"capabilities": "admin"}})
+    await db.audit_log.insert_one({"id": new_id(), "action": "admin_granted" if body.is_admin else "admin_revoked",
+                                   "user_id": user_id, "by": admin["id"], "at": now_iso()})
     return public_user(await db.users.find_one({"id": user_id}))
 
 

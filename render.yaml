@@ -1,4 +1,6 @@
 services:
+  # Live shop is a separate Render static service named dailycartindia-web
+  # (manual deploy). Do not add another static service named dailycart-web.
   - type: web
     name: dailycart-api
     runtime: python
@@ -20,17 +22,3 @@ services:
         sync: false
       - key: RAZORPAY_KEY_SECRET
         sync: false
-
-  - type: web
-    name: dailycart-web
-    runtime: static
-    rootDir: frontend
-    buildCommand: npm ci --legacy-peer-deps && npm run build
-    staticPublishPath: ./build
-    envVars:
-      - key: REACT_APP_BACKEND_URL
-        sync: false
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html

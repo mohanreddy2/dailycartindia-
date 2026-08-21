@@ -6,11 +6,13 @@ import { Label } from '../../components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { api, errMsg } from '../../lib/api';
+import { useAuth } from '../../lib/store';
 import { EmptyState, RowSkeletons } from '../../components/shared/bits';
 import { toast } from 'sonner';
-import { Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { Pencil, Plus, Shield, ShieldOff, Trash2, Users } from 'lucide-react';
 
 export default function UsersAdmin() {
+  const { user: me } = useAuth();
   const [users, setUsers] = useState(null);
   const [selected, setSelected] = useState(null);
   const [form, setForm] = useState(null);
@@ -40,7 +42,12 @@ export default function UsersAdmin() {
     try {
       if (selected) {
         await api.patch(`/admin/users/${selected.id}`, { name: form.name, email: form.email, phone: form.phone || null });
-        toast.success('User details updated');
+        if (form.password) {
+          await api.patch(`/admin/users/${selected.id}/password`, { password: form.password });
+          toast.success('User updated and password reset');
+        } else {
+          toast.success('User details updated');
+        }
       } else {
         await api.post('/admin/users', form);
         toast.success('User created');
@@ -59,12 +66,25 @@ export default function UsersAdmin() {
     } catch (error) { toast.error(errMsg(error)); } finally { setBusy(false); }
   };
 
+  const toggleAdmin = async (user) => {
+    const making = !(user.capabilities || []).includes('admin');
+    if (!window.confirm(making
+      ? `Give ${user.name} admin access to Ops?`
+      : `Remove admin access from ${user.name}?`)) return;
+    setBusy(true);
+    try {
+      await api.patch(`/admin/users/${user.id}/admin`, { is_admin: making });
+      toast.success(making ? `${user.name} is now an admin` : `${user.name} is no longer an admin`);
+      load();
+    } catch (error) { toast.error(errMsg(error)); } finally { setBusy(false); }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-xl font-bold">Users</h1>
-          <p className="text-sm text-muted-foreground">Manage customer accounts and contact details.</p>
+          <p className="text-sm text-muted-foreground">Manage accounts, reset passwords, and grant admin access.</p>
         </div>
         <Button data-testid="admin-user-add-button" size="sm" className="gap-1" onClick={openCreate}><Plus className="h-4 w-4" /> Add user</Button>
       </div>
@@ -106,6 +126,19 @@ export default function UsersAdmin() {
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button size="icon" variant="ghost" title="Edit user" onClick={() => openEdit(u)}><Pencil className="h-4 w-4" /></Button>
+                      {u.is_active !== false && u.id !== me?.id && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title={(u.capabilities || []).includes('admin') ? 'Remove admin' : 'Make admin'}
+                          disabled={busy}
+                          onClick={() => toggleAdmin(u)}
+                        >
+                          {(u.capabilities || []).includes('admin')
+                            ? <ShieldOff className="h-4 w-4 text-destructive" />
+                            : <Shield className="h-4 w-4" />}
+                        </Button>
+                      )}
                       {u.is_active !== false && <Button size="icon" variant="ghost" className="text-destructive" title="Remove user" disabled={busy} onClick={() => remove(u)}><Trash2 className="h-4 w-4" /></Button>}
                     </div>
                   </TableCell>
@@ -131,6 +164,7 @@ export default function UsersAdmin() {
               <div className="space-y-1"><Label htmlFor="admin-user-email">Email</Label><Input id="admin-user-email" type="email" required value={form.email} onChange={(e) => change('email', e.target.value)} /></div>
               <div className="space-y-1"><Label htmlFor="admin-user-phone">Phone</Label><Input id="admin-user-phone" value={form.phone} onChange={(e) => change('phone', e.target.value)} /></div>
               {!selected && <div className="space-y-1"><Label htmlFor="admin-user-password">Temporary password</Label><Input id="admin-user-password" type="password" minLength="6" required value={form.password} onChange={(e) => change('password', e.target.value)} /></div>}
+              {selected && <div className="space-y-1"><Label htmlFor="admin-user-password">New password (optional)</Label><Input id="admin-user-password" type="password" minLength="6" value={form.password} onChange={(e) => change('password', e.target.value)} placeholder="Leave blank to keep current password" /></div>}
               <DialogFooter><Button type="button" variant="outline" onClick={() => setForm(null)}>Cancel</Button><Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save user'}</Button></DialogFooter>
             </form>
           )}
