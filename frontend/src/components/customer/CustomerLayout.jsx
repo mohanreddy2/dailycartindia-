@@ -180,6 +180,16 @@ export default function CustomerLayout() {
         <Outlet />
       </main>
 
+      <footer className="mx-auto max-w-6xl px-4 py-6 pb-24 text-xs text-muted-foreground md:pb-8">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-4">
+          <span>Daily Cart 24/7 Private Limited</span>
+          <Link to="/privacy" className="underline-offset-2 hover:underline">Privacy</Link>
+          <Link to="/terms" className="underline-offset-2 hover:underline">Terms</Link>
+          <Link to="/refund" className="underline-offset-2 hover:underline">Refunds</Link>
+          <Link to="/partner" className="underline-offset-2 hover:underline">Become a partner</Link>
+        </div>
+      </footer>
+
       <nav data-testid="bottom-nav" aria-label="Primary" className="fixed bottom-0 inset-x-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
         <div className="mx-auto flex h-16 max-w-lg items-stretch">
           {navItems.map(({ to, icon: Icon, label, testid }) => {

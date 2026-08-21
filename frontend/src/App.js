@@ -16,6 +16,8 @@ import OrderDetail from './pages/customer/OrderDetail';
 import BookingDetail from './pages/customer/BookingDetail';
 import Account from './pages/customer/Account';
 import AuthPage from './pages/customer/AuthPage';
+import LegalPage from './pages/customer/LegalPage';
+import PartnerPage from './pages/customer/PartnerPage';
 
 import VendorLayout from './components/vendor/VendorLayout';
 import VendorAuth from './pages/vendor/VendorAuth';
@@ -58,6 +60,10 @@ function App() {
                 <Route path="/bookings/:id" element={<BookingDetail />} />
                 <Route path="/account" element={<Account />} />
                 <Route path="/auth" element={<AuthPage />} />
+                <Route path="/privacy" element={<LegalPage kind="privacy" />} />
+                <Route path="/terms" element={<LegalPage kind="terms" />} />
+                <Route path="/refund" element={<LegalPage kind="refund" />} />
+                <Route path="/partner" element={<PartnerPage />} />
               </Route>
 
               {/* Vendor portal */}

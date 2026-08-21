@@ -64,12 +64,6 @@ export default function AuthPage({ portal = 'customer' }) {
     } catch (err) { toast.error(errMsg(err)); } finally { setBusy(false); }
   };
 
-  const demoHint = portal === 'admin'
-    ? { email: 'admin@dailycart.in', password: 'Admin@123', note: 'Ops console' }
-    : portal === 'vendor'
-      ? { email: 'vendor.mart@dailycart.in', password: 'Demo@123', note: 'Mart partner (or vendor.service@…)' }
-      : { email: 'customer@dailycart.in', password: 'Demo@123', note: 'Customer app' };
-
   return (
     <div className="mx-auto max-w-md py-8">
       <div className="mb-6 text-center">
@@ -148,13 +142,6 @@ export default function AuthPage({ portal = 'customer' }) {
           </TabsContent>
         </Tabs>
       </Card>
-
-      <div data-testid="auth-demo-hint" className="mt-4 rounded-xl border border-dashed bg-muted/40 px-3 py-2.5 text-center">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Demo · {demoHint.note}</p>
-        <p className="mt-0.5 font-mono text-xs tabular-nums text-foreground">
-          {demoHint.email} <span className="text-muted-foreground">/</span> {demoHint.password}
-        </p>
-      </div>
     </div>
   );
 }

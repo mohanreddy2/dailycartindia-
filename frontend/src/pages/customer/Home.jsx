@@ -168,7 +168,7 @@ export default function Home() {
             <h3 className="font-display text-lg font-semibold text-[hsl(var(--serve-soft-foreground))]">Own a store or provide services?</h3>
             <p className="text-sm text-[hsl(var(--serve-soft-foreground))]/80">Join DailyPro — get orders, manage inventory & grow your business.</p>
           </div>
-          <button type="button" data-testid="become-vendor-button" onClick={() => navigate('/vendor')}
+          <button type="button" data-testid="become-vendor-button" onClick={() => navigate('/partner')}
             className="inline-flex items-center gap-1 rounded-xl bg-[hsl(var(--serve))] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
             Become a partner <ChevronRight className="h-4 w-4" aria-hidden />
           </button>
