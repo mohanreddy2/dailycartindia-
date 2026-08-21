@@ -122,7 +122,7 @@ Ironing · laundry · cobbler · tailor · tiffin · RO · pest/fogging · gas s
 | Frontend | `frontend/` | CRA + CRACO, Tailwind, shadcn/ui |
 | Backend | `backend/` | FastAPI routers: auth, public, customer, vendor, admin |
 | Seed | `backend/seed.py` | India multi-city catalog + activity |
-| Docs | `docs/` | UAT report, research notes, screenshots |
+| Docs | `docs/` | [SOP](docs/SOP.md) (ops + stack + troubleshooting), UAT, screenshots |
 
 ---
 
