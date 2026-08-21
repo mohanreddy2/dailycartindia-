@@ -5,8 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from core import (db, new_id, now_iso, strip_id, get_current_user, require_vendor,
-                  get_vendor_profile, BOOKING_FLOW, can_advance,
-                  apply_order_status)
+                  get_vendor_profile, apply_order_status, apply_booking_status)
 
 router = APIRouter(prefix="/vendor", tags=["vendor"])
 MAX_INLINE_IMAGE_CHARS = 700_000  # ~500 KB source image after base64 encoding
@@ -246,20 +245,7 @@ async def vendor_job_status(booking_id: str, body: StatusBody, user: dict = Depe
     booking = await db.bookings.find_one({"id": booking_id, "vendor_id": vendor["id"]})
     if not booking:
         raise HTTPException(status_code=404, detail="Job not found")
-    current, target = booking["status"], body.status
-    if target == "declined":
-        if current != "requested":
-            raise HTTPException(status_code=400, detail="Can only decline a new request")
-    elif not can_advance(BOOKING_FLOW, current, target):
-        raise HTTPException(status_code=400, detail=f"Cannot move from '{current}' to '{target}'")
-    await db.bookings.update_one({"id": booking_id}, {
-        "$set": {"status": target},
-        "$push": {"status_history": {"status": target, "at": now_iso(), "by": "vendor"}},
-    })
-    await db.audit_log.insert_one({"id": new_id(), "action": "booking_status", "booking_id": booking_id,
-                                   "from": current, "to": target, "by": user["id"], "at": now_iso()})
-    updated = await db.bookings.find_one({"id": booking_id})
-    return strip_id(updated)
+    return await apply_booking_status(booking, body.status, actor="vendor", actor_id=user["id"])
 
 
 # ---------- inventory ----------

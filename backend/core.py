@@ -167,3 +167,22 @@ async def apply_order_status(order: dict, target: str, *, actor: str, actor_id: 
         "from": current, "to": target, "by": actor_id, "at": now_iso(),
     })
     return strip_id(await db.orders.find_one({"id": order["id"]}))
+
+
+async def apply_booking_status(booking: dict, target: str, *, actor: str, actor_id: str) -> dict:
+    """Advance or decline a service booking. Same rules for vendor and admin."""
+    current = booking["status"]
+    if target == "declined":
+        if current != "requested":
+            raise HTTPException(status_code=400, detail="Can only decline a new request")
+    elif not can_advance(BOOKING_FLOW, current, target):
+        raise HTTPException(status_code=400, detail=f"Cannot move from '{current}' to '{target}'")
+    await db.bookings.update_one({"id": booking["id"]}, {
+        "$set": {"status": target},
+        "$push": {"status_history": {"status": target, "at": now_iso(), "by": actor}},
+    })
+    await db.audit_log.insert_one({
+        "id": new_id(), "action": "booking_status", "booking_id": booking["id"],
+        "from": current, "to": target, "by": actor_id, "at": now_iso(),
+    })
+    return strip_id(await db.bookings.find_one({"id": booking["id"]}))

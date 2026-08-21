@@ -4,7 +4,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, Field
 
-from core import db, hash_password, new_id, now_iso, strip_id, require_admin, apply_order_status
+from core import db, hash_password, new_id, now_iso, strip_id, require_admin, apply_order_status, apply_booking_status
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -299,6 +299,14 @@ async def all_bookings(status: Optional[str] = None, admin: dict = Depends(requi
     q = {"status": status} if status else {}
     docs = await db.bookings.find(q).sort("created_at", -1).to_list(300)
     return strip_id(docs)
+
+
+@router.patch("/bookings/{booking_id}/status")
+async def admin_booking_status(booking_id: str, body: OrderStatusBody, admin: dict = Depends(require_admin)):
+    booking = await db.bookings.find_one({"id": booking_id})
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    return await apply_booking_status(booking, body.status, actor="admin", actor_id=admin["id"])
 
 
 @router.get("/disputes")

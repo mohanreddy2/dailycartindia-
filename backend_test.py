@@ -694,6 +694,28 @@ class DailyCartTester:
                     data={"status": "accepted"}
                 )
 
+            success, bookings = self.test(
+                "Admin List Bookings",
+                "GET", "admin/bookings", 200,
+                token=self.admin_token
+            )
+            requested = next((b for b in (bookings or []) if isinstance(b, dict) and b.get("status") == "requested"), None)
+            if requested:
+                self.test(
+                    "Admin Booking Status: requested → accepted",
+                    "PATCH", f"admin/bookings/{requested['id']}/status", 200,
+                    token=self.admin_token,
+                    data={"status": "accepted"}
+                )
+            if self.customer_token:
+                dummy_b = requested["id"] if requested else "missing-booking"
+                self.test(
+                    "Customer cannot process admin bookings",
+                    "PATCH", f"admin/bookings/{dummy_b}/status", 403,
+                    token=self.customer_token,
+                    data={"status": "accepted"}
+                )
+
         # Print Summary
         self.print_summary()
 
