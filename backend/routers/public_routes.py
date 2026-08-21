@@ -5,7 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from core import db, strip_id
+from core import db, public_vendor, strip_id
 
 router = APIRouter(tags=["public"])
 
@@ -34,7 +34,7 @@ async def geo_vendors(lat: float, lng: float, radius_km: float, extra_query: dic
     docs = await db.vendors.aggregate(pipeline).to_list(limit)
     out = []
     for d in docs:
-        d = strip_id(d)
+        d = public_vendor(d)
         d["distance_km"] = round(d.pop("distance_m", 0) / 1000, 2)
         out.append(d)
     return out
@@ -147,7 +147,7 @@ async def store_detail(store_id: str):
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
     products = await db.products.find({"vendor_id": store_id}).to_list(200)
-    return {"store": strip_id(store), "products": strip_id(products)}
+    return {"store": public_vendor(store), "products": strip_id(products)}
 
 
 @router.get("/service-vendors/{vendor_id}")
@@ -157,7 +157,7 @@ async def service_vendor_detail(vendor_id: str):
         raise HTTPException(status_code=404, detail="Service provider not found")
     services = await db.services.find({"vendor_id": vendor_id}).to_list(100)
     reviews = await db.reviews.find({"vendor_id": vendor_id}).sort("created_at", -1).limit(10).to_list(10)
-    return {"vendor": strip_id(vendor), "services": strip_id(services), "reviews": strip_id(reviews)}
+    return {"vendor": public_vendor(vendor), "services": strip_id(services), "reviews": strip_id(reviews)}
 
 
 @router.get("/services/{service_id}")
@@ -166,7 +166,7 @@ async def service_detail(service_id: str):
     if not svc:
         raise HTTPException(status_code=404, detail="Service not found")
     vendor = await db.vendors.find_one({"id": svc["vendor_id"]})
-    return {"service": strip_id(svc), "vendor": strip_id(vendor)}
+    return {"service": strip_id(svc), "vendor": public_vendor(vendor)}
 
 
 @router.get("/services/{service_id}/slots")

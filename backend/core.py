@@ -58,6 +58,19 @@ def strip_id(doc):
     return doc
 
 
+def public_vendor(doc):
+    """Shopper-facing vendor payload: never include KYC documents or account ids."""
+    d = strip_id(doc)
+    if d is None:
+        return None
+    if isinstance(d, list):
+        return [public_vendor(x) for x in d]
+    if isinstance(d, dict):
+        for k in ("kyc", "kyc_status", "user_id"):
+            d.pop(k, None)
+    return d
+
+
 # ---------- password ----------
 
 def hash_password(pw: str) -> str:
