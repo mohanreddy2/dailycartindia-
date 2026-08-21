@@ -11,6 +11,7 @@ import { api, inr } from '../../lib/api';
 import { useAuth, useCart, useLocationCtx } from '../../lib/store';
 import { cn } from '../../lib/utils';
 import { Thumb } from '../shared/thumb';
+import WhatsAppLinks from '../shared/WhatsAppLinks';
 
 function LocationPicker() {
   const { location, setLocation } = useLocationCtx();
@@ -188,6 +189,7 @@ export default function CustomerLayout() {
           <Link to="/refund" className="underline-offset-2 hover:underline">Refunds</Link>
           <Link to="/partner" className="underline-offset-2 hover:underline">Become a partner</Link>
         </div>
+        <WhatsAppLinks className="mt-3" />
       </footer>
 
       <nav data-testid="bottom-nav" aria-label="Primary" className="fixed bottom-0 inset-x-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">

@@ -9,6 +9,7 @@ import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { useAuth } from '../../lib/store';
 import { cn } from '../../lib/utils';
+import WhatsAppLinks from '../shared/WhatsAppLinks';
 
 /**
  * KycGate — shown when vendor's KYC is pending or rejected.
@@ -41,7 +42,7 @@ function KycGate({ vendor }) {
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {rejected
-              ? `Your verification for "${vendor.name}" was rejected${vendor.kyc?.decision_note ? `: ${vendor.kyc.decision_note}` : '.'} Please contact support.`
+              ? `Your verification for "${vendor.name}" was rejected${vendor.kyc?.decision_note ? `: ${vendor.kyc.decision_note}` : '.'} WhatsApp support below.`
               : `Thanks for registering. Our ops team is reviewing your details and will approve you within 24 hours.`}
           </p>
         </div>
@@ -79,6 +80,8 @@ function KycGate({ vendor }) {
             Checking for approval every 30 seconds…
           </p>
         )}
+
+        <WhatsAppLinks className="justify-center text-xs text-muted-foreground" prefix="WhatsApp support" />
 
         <div className="flex flex-col gap-2">
           <Button variant="outline" className="w-full" onClick={() => navigate('/')}>

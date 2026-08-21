@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import WhatsAppLinks from '../../components/shared/WhatsAppLinks';
 
 const COMPANY = 'Daily Cart 24/7 Private Limited';
 const CIN = 'U52202KA2019PTC128429';
@@ -29,7 +30,7 @@ const COPY = {
       },
       {
         heading: 'Your rights',
-        body: `You can ask to see, correct, or delete your account data by emailing ${EMAILS[0]} or ${EMAILS[1]}.`,
+        body: `You can ask to see, correct, or delete your account data by emailing ${EMAILS[0]} or ${EMAILS[1]}, or by WhatsApp.`,
       },
     ],
   },
@@ -55,7 +56,7 @@ const COPY = {
       },
       {
         heading: 'Contact',
-        body: `${ADDRESS}. Email ${EMAILS[0]} or ${EMAILS[1]}.`,
+        body: `${ADDRESS}. Email ${EMAILS[0]} or ${EMAILS[1]}, or WhatsApp the numbers below.`,
       },
     ],
   },
@@ -77,7 +78,7 @@ const COPY = {
       },
       {
         heading: 'How to ask',
-        body: `Use My orders in the app, or email ${EMAILS[0]} / ${EMAILS[1]} with your order number.`,
+        body: `Use My orders in the app, email ${EMAILS[0]} / ${EMAILS[1]} with your order number, or WhatsApp us.`,
       },
     ],
   },
@@ -99,6 +100,7 @@ export default function LegalPage({ kind }) {
           <p className="text-sm leading-relaxed text-muted-foreground">{s.body}</p>
         </section>
       ))}
+      <WhatsAppLinks className="text-sm text-muted-foreground" />
       <p className="text-xs text-muted-foreground">
         <Link className="underline" to="/privacy">Privacy</Link>
         {' · '}

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Store, Wrench, ChevronRight } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
+import WhatsAppLinks from '../../components/shared/WhatsAppLinks';
 
 export default function PartnerPage() {
   const navigate = useNavigate();
@@ -41,6 +42,7 @@ export default function PartnerPage() {
       <p className="text-center text-xs text-muted-foreground">
         Already have an account? The same login opens DailyPro after you apply.
       </p>
+      <WhatsAppLinks className="justify-center text-xs text-muted-foreground" prefix="Questions? WhatsApp" />
     </div>
   );
 }
