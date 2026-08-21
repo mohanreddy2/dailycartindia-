@@ -701,11 +701,24 @@ class DailyCartTester:
             )
             requested = next((b for b in (bookings or []) if isinstance(b, dict) and b.get("status") == "requested"), None)
             if requested:
+                bid = requested["id"]
                 self.test(
                     "Admin Booking Status: requested → accepted",
-                    "PATCH", f"admin/bookings/{requested['id']}/status", 200,
+                    "PATCH", f"admin/bookings/{bid}/status", 200,
                     token=self.admin_token,
                     data={"status": "accepted"}
+                )
+                self.test(
+                    "Admin cannot skip booking steps",
+                    "PATCH", f"admin/bookings/{bid}/status", 400,
+                    token=self.admin_token,
+                    data={"status": "completed"}
+                )
+                self.test(
+                    "Admin can cancel accepted booking",
+                    "PATCH", f"admin/bookings/{bid}/status", 200,
+                    token=self.admin_token,
+                    data={"status": "cancelled"}
                 )
             if self.customer_token:
                 dummy_b = requested["id"] if requested else "missing-booking"

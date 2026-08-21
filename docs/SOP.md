@@ -322,7 +322,8 @@ If you previously used `/auth` as a customer, **logout first** or you will see A
 2. Filter **Requested** for new work
 3. Click **Accept job**, then **Start travel** → **Begin work** → **Mark completed**
 4. **Reject** only on a new (`requested`) booking — stored as `declined`
-5. You cannot jump to Completed in one click. Customer cancel still works only while `requested` or `accepted`.
+5. **Cancel booking** only while `requested` or `accepted` (same window as the customer). After **Start travel**, cancel is blocked.
+6. You cannot jump to Completed in one click.
 
 **What admin cannot do (do not look for these buttons)**
 

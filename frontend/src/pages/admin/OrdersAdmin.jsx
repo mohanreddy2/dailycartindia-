@@ -13,7 +13,7 @@ const FILTERS = ['all', 'placed', 'accepted', 'picking', 'ready', 'out_for_deliv
 
 const JOB_NEXT = { requested: 'accepted', accepted: 'en_route', en_route: 'in_progress', in_progress: 'completed' };
 const JOB_NEXT_LABEL = { requested: 'Accept job', accepted: 'Start travel', en_route: 'Begin work', in_progress: 'Mark completed' };
-const JOB_FILTERS = ['all', 'requested', 'accepted', 'en_route', 'in_progress', 'completed'];
+const JOB_FILTERS = ['all', 'requested', 'accepted', 'en_route', 'in_progress', 'completed', 'cancelled', 'declined'];
 
 export function OrdersAdmin() {
   const [orders, setOrders] = useState(null);
@@ -148,7 +148,7 @@ export function BookingsAdmin() {
       const { data: updated } = await api.patch(`/admin/bookings/${booking.id}/status`, { status });
       toast.success(`${booking.booking_no} → ${label(status)}`);
       setBookings((prev) => (prev || []).map((b) => (b.id === booking.id ? updated : b)));
-      if (filter !== 'all' && filter !== status && status !== 'declined') {
+      if (filter !== 'all' && filter !== status && status !== 'declined' && status !== 'cancelled') {
         setFilter(status);
       }
       load();
@@ -166,7 +166,7 @@ export function BookingsAdmin() {
       <div>
         <h1 className="font-display text-xl font-bold">All bookings</h1>
         <p className="text-sm text-muted-foreground">
-          Process service jobs here if the partner is slow — same steps as DailyPro: accept, travel, complete, or decline a new request.
+          Same steps as DailyPro — you cannot skip ahead. Cancel is only available while the job is requested or accepted.
         </p>
       </div>
       <Tabs value={filter} onValueChange={setFilter}>
@@ -205,16 +205,18 @@ export function BookingsAdmin() {
                   <span className="text-sm font-bold tabular-nums">{inr(b.price)}</span>
                 </div>
               </div>
-              {JOB_NEXT[b.status] && (
-                <div className="mt-3 flex gap-2">
-                  <Button
-                    data-testid="admin-booking-advance-status-button"
-                    size="sm"
-                    disabled={busyId === b.id}
-                    onClick={() => advance(b, JOB_NEXT[b.status])}
-                  >
-                    {JOB_NEXT_LABEL[b.status]}
-                  </Button>
+              {(JOB_NEXT[b.status] || ['requested', 'accepted'].includes(b.status)) && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {JOB_NEXT[b.status] && (
+                    <Button
+                      data-testid="admin-booking-advance-status-button"
+                      size="sm"
+                      disabled={busyId === b.id}
+                      onClick={() => advance(b, JOB_NEXT[b.status])}
+                    >
+                      {JOB_NEXT_LABEL[b.status]}
+                    </Button>
+                  )}
                   {b.status === 'requested' && (
                     <Button
                       data-testid="admin-booking-decline-button"
@@ -225,6 +227,17 @@ export function BookingsAdmin() {
                       onClick={() => advance(b, 'declined')}
                     >
                       <X className="h-3.5 w-3.5" /> Reject
+                    </Button>
+                  )}
+                  {['requested', 'accepted'].includes(b.status) && (
+                    <Button
+                      data-testid="admin-booking-cancel-button"
+                      size="sm"
+                      variant="outline"
+                      disabled={busyId === b.id}
+                      onClick={() => advance(b, 'cancelled')}
+                    >
+                      Cancel booking
                     </Button>
                   )}
                 </div>
