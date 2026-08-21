@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from core import (db, new_id, now_iso, strip_id, get_current_user, require_vendor,
-                  get_vendor_profile, ORDER_FLOW, BOOKING_FLOW, can_advance)
+                  get_vendor_profile, BOOKING_FLOW, can_advance,
+                  apply_order_status)
 
 router = APIRouter(prefix="/vendor", tags=["vendor"])
 MAX_INLINE_IMAGE_CHARS = 700_000  # ~500 KB source image after base64 encoding
@@ -224,22 +225,7 @@ async def vendor_order_status(order_id: str, body: StatusBody, user: dict = Depe
     order = await db.orders.find_one({"id": order_id, "vendor_id": vendor["id"]})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    current, target = order["status"], body.status
-    if target == "rejected":
-        if current != "placed":
-            raise HTTPException(status_code=400, detail="Can only reject a new order")
-        for item in order["items"]:
-            await db.products.update_one({"id": item["product_id"]}, {"$inc": {"stock_qty": item["qty"]}})
-    elif not can_advance(ORDER_FLOW, current, target):
-        raise HTTPException(status_code=400, detail=f"Cannot move from '{current}' to '{target}'")
-    await db.orders.update_one({"id": order_id}, {
-        "$set": {"status": target},
-        "$push": {"status_history": {"status": target, "at": now_iso(), "by": "vendor"}},
-    })
-    await db.audit_log.insert_one({"id": new_id(), "action": "order_status", "order_id": order_id,
-                                   "from": current, "to": target, "by": user["id"], "at": now_iso()})
-    updated = await db.orders.find_one({"id": order_id})
-    return strip_id(updated)
+    return await apply_order_status(order, body.status, actor="vendor", actor_id=user["id"])
 
 
 # ---------- service jobs ----------

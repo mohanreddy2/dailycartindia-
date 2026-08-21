@@ -672,6 +672,28 @@ class DailyCartTester:
                 self.log(f"Bookings Total: {resp.get('bookings_total')}")
                 self.log(f"GMV: ₹{resp.get('gmv')}")
 
+            success, orders = self.test(
+                "Admin List Orders",
+                "GET", "admin/orders", 200,
+                token=self.admin_token
+            )
+            placed = next((o for o in (orders or []) if isinstance(o, dict) and o.get("status") == "placed"), None)
+            if placed:
+                self.test(
+                    "Admin Order Status: placed → accepted",
+                    "PATCH", f"admin/orders/{placed['id']}/status", 200,
+                    token=self.admin_token,
+                    data={"status": "accepted"}
+                )
+            if self.customer_token:
+                dummy = placed["id"] if placed else "missing-order"
+                self.test(
+                    "Customer cannot process admin orders",
+                    "PATCH", f"admin/orders/{dummy}/status", 403,
+                    token=self.customer_token,
+                    data={"status": "accepted"}
+                )
+
         # Print Summary
         self.print_summary()
 

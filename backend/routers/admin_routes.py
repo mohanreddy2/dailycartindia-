@@ -4,7 +4,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, Field
 
-from core import db, hash_password, new_id, now_iso, strip_id, require_admin
+from core import db, hash_password, new_id, now_iso, strip_id, require_admin, apply_order_status
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -20,6 +20,10 @@ class ActiveBody(BaseModel):
 
 class ResolveBody(BaseModel):
     resolution: str
+
+
+class OrderStatusBody(BaseModel):
+    status: str
 
 
 class AdminUserCreate(BaseModel):
@@ -280,6 +284,14 @@ async def all_orders(status: Optional[str] = None, admin: dict = Depends(require
     q = {"status": status} if status else {}
     docs = await db.orders.find(q).sort("created_at", -1).to_list(300)
     return strip_id(docs)
+
+
+@router.patch("/orders/{order_id}/status")
+async def admin_order_status(order_id: str, body: OrderStatusBody, admin: dict = Depends(require_admin)):
+    order = await db.orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return await apply_order_status(order, body.status, actor="admin", actor_id=admin["id"])
 
 
 @router.get("/bookings")

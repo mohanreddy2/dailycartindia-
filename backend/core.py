@@ -146,3 +146,24 @@ def can_advance(flow: list, current: str, target: str) -> bool:
     if current not in flow or target not in flow:
         return False
     return flow.index(target) == flow.index(current) + 1
+
+
+async def apply_order_status(order: dict, target: str, *, actor: str, actor_id: str) -> dict:
+    """Advance or reject a grocery order. Same rules for vendor and admin."""
+    current = order["status"]
+    if target == "rejected":
+        if current != "placed":
+            raise HTTPException(status_code=400, detail="Can only reject a new order")
+        for item in order.get("items") or []:
+            await db.products.update_one({"id": item["product_id"]}, {"$inc": {"stock_qty": item["qty"]}})
+    elif not can_advance(ORDER_FLOW, current, target):
+        raise HTTPException(status_code=400, detail=f"Cannot move from '{current}' to '{target}'")
+    await db.orders.update_one({"id": order["id"]}, {
+        "$set": {"status": target},
+        "$push": {"status_history": {"status": target, "at": now_iso(), "by": actor}},
+    })
+    await db.audit_log.insert_one({
+        "id": new_id(), "action": "order_status", "order_id": order["id"],
+        "from": current, "to": target, "by": actor_id, "at": now_iso(),
+    })
+    return strip_id(await db.orders.find_one({"id": order["id"]}))

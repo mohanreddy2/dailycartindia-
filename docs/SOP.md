@@ -142,7 +142,7 @@ Discovery only returns vendors with `kyc_status=approved` and `is_active=true`. 
 | **Customer** | Register, shop, book, COD checkout, cancel early, review after done, open a dispute | Become admin; see another user’s orders |
 | **Mart vendor** | Inventory CRUD, accept/advance/reject grocery orders, earnings | Approve own KYC; change another store |
 | **Service vendor** | Services CRUD, availability, accept/advance/decline jobs | Same as above |
-| **Admin** | KYC approve/reject, create/edit/deactivate vendors and users, view all orders/bookings, resolve disputes | Reset passwords; promote a user to admin; change catalog prices (that is the vendor) |
+| **Admin** | KYC approve/reject, create/edit/deactivate vendors and users, **process grocery orders** (accept → deliver or reject), view bookings, resolve disputes | Reset passwords; promote a user to admin; change catalog prices (that is the vendor); process service jobs from `/admin/bookings` (still vendor-only) |
 
 Catalog photos, prices, and stock are changed by the **vendor** on `/vendor`. Legal pages (`/privacy`, `/terms`, `/refund`, `/partner`) are code — change them in git, then redeploy **`dailycartindia-web`**.
 
@@ -176,7 +176,8 @@ placed → accepted → picking → ready → out_for_delivery → delivered
    └── cancelled by customer (only from placed; stock restored)
 ```
 
-Vendor buttons: Accept → Start picking → Mark ready → Out for delivery → Mark delivered.
+Vendor **or admin** buttons: Accept → Start picking → Mark ready → Out for delivery → Mark delivered.
+Ops process at https://dailycartindia.com/admin/orders (same steps; cannot skip).
 
 **If this flow fails**
 
@@ -291,7 +292,7 @@ If you previously used `/auth` as a customer, **logout first** or you will see A
 | KYC | `/admin/kyc` | Filter pending / approved / rejected. Open a row → Approve or Reject with a note. This is the gate that puts a partner on the public map. |
 | Vendors | `/admin/vendors` | List, create, edit name/address/geo/fees, toggle **active**. Deactivating hides them from discovery and blocks checkout. |
 | Users | `/admin/users` | Create customer (name, email, password, phone). Edit name/email/phone. Deactivate (soft delete; also deactivates their vendor). Cannot reset password or grant admin. |
-| Orders | `/admin/orders` | View-only grocery orders. Status is changed by the store. |
+| Orders | `/admin/orders` | Watch **and process** grocery orders: Accept → picking → ready → out for delivery → delivered. Reject only while `placed`. Same rules as the store. |
 | Bookings | `/admin/bookings` | View-only jobs. Status is changed by the pro. |
 | Disputes | `/admin/disputes` | Open disputes from customers. Write a resolution → mark resolved. |
 
@@ -301,13 +302,22 @@ If you previously used `/auth` as a customer, **logout first** or you will see A
 2. KYC queue → verify ID offline if needed → Approve.
 3. Ask partner to add real photos/prices on `/vendor/inventory`.
 4. Spot-check Home in that city.
-5. Watch `/admin/orders` after the first customer order. If the store does not accept, call them — ops cannot click Accept for them.
+5. Watch `/admin/orders` after the first customer order. If the store is slow, ops can **Accept / pack / deliver** (or **Reject**) from that screen.
+
+**How to process an order as admin**
+
+1. Log in at https://dailycartindia.com/admin/login
+2. Open **Orders** (https://dailycartindia.com/admin/orders)
+3. Filter **Placed** for new work
+4. Click **Accept order**, then **Start picking** → **Mark ready** → **Out for delivery** → **Mark delivered**
+5. **Reject** only on a new (`placed`) order — that restores stock
+6. You cannot jump to Delivered in one click. Customer cancel still only works before Accept.
 
 **What admin cannot do (do not look for these buttons)**
 
 - Reset a password
 - Make another user an admin
-- Force an order to `delivered`
+- Skip order steps (must go placed → accepted → picking → ready → out_for_delivery → delivered)
 - Refund Razorpay (do that in the Razorpay Dashboard, and only after live capture works)
 
 ---
