@@ -5,7 +5,7 @@
 **Code:** [github.com/mohanreddy2/dailycartindia-](https://github.com/mohanreddy2/dailycartindia-)  
 **Last updated:** 21 August 2026  
 
-Use this document to run the live shop, onboard partners, fulfill orders, take payments, deploy code, and recover when something fails. Read **section 1** if you only need URLs; follow **sections 5–9** for the actual day-to-day work.
+Use this document to run the live shop, onboard partners, fulfill orders, take payments, deploy code, and recover when something fails. Read **section 1** if you only need URLs; follow **sections 5–9** for the actual day-to-day work. To **see or edit MongoDB data**, use [section 16](#16-database--read-and-update-live-data) and [`SOP_DATABASE.md`](SOP_DATABASE.md).
 
 ---
 
@@ -26,6 +26,7 @@ Use this document to run the live shop, onboard partners, fulfill orders, take p
 13. [Troubleshooting (mapped to each failure)](#13-troubleshooting-mapped-to-each-failure)
 14. [Hard rules](#14-hard-rules)
 15. [Contacts](#15-contacts)
+16. [Database — read and update live data](#16-database--read-and-update-live-data)
 
 ---
 
@@ -534,6 +535,7 @@ Reviews only after grocery `delivered` or booking `completed`. One review per or
 7. Merchant “Uh oh” with Created Razorpay orders and zero captures is **account enablement**, not a missing button.
 8. Do not run `seed.py --force` on production.
 9. Admin login is `/admin/login`, not `/auth`.
+10. Prefer Admin UI for data changes. Raw Atlas edits must filter on UUID field **`id`**, not Mongo `_id`. Full recipes: [`SOP_DATABASE.md`](SOP_DATABASE.md).
 
 ---
 
@@ -543,10 +545,33 @@ Reviews only after grocery `delivered` or booking `completed`. One review per or
 |-------|--------|
 | Shop support | support@dailycart24x7.com |
 | Founder | mohan.reddy02@gmail.com |
-| WhatsApp | +65 9062 8025 · +91 91107 59384 |
+| WhatsApp | +65 90628025 · +91 9741188878 · +91 9347533422 · +91 9110759384 |
 | Render | dashboard.render.com → `dailycart-api`, `dailycartindia-web` |
 | Razorpay | dashboard.razorpay.com → support for live capture |
 | Domain | Squarespace → dailycartindia.com DNS |
+| Database | MongoDB Atlas → [SOP_DATABASE.md](SOP_DATABASE.md) |
 | Code | GitHub → mohanreddy2/dailycartindia- |
 
-Related: `docs/DEPLOY_RENDER.md` (first-time hosting), `README.md` (product overview), `docs/UAT_READY.md` (test checklist).
+Related: `docs/DEPLOY_RENDER.md` (first-time hosting), `docs/SOP_DATABASE.md` (see and edit live data), `README.md` (product overview), `docs/UAT_READY.md` (test checklist).
+
+---
+
+## 16. Database — read and update live data
+
+**Full technical SOP:** [`docs/SOP_DATABASE.md`](SOP_DATABASE.md)
+
+Short version:
+
+1. Open https://cloud.mongodb.com → **Data Explorer** → **Cluster0** → database **`dailycart`**.
+2. The shop never talks to Mongo. Only `dailycart-api` does (`MONGO_URL` + `DB_NAME=dailycart` on Render).
+3. Every record the API uses has a UUID field named **`id`**. Do not update by Mongo `_id`.
+4. **Prefer Admin** (https://dailycartindia.com/admin) for passwords, make-admin, KYC, catalog, order status. Atlas is for geo, cities, bulk hide, and stuck documents.
+5. After an Atlas edit: no deploy is required. Hard-refresh the shop. Login again if you changed `capabilities` or password.
+6. Never run `python seed.py --force` against this cluster.
+
+Common Atlas update (example — hide a store):
+
+```json
+Filter:  { "id": "<vendor-uuid>" }
+Update:  { "$set": { "is_active": false } }
+```
