@@ -31,6 +31,9 @@ export function StoreCard({ store, onClick }) {
           {store.website && (
             <p className="truncate text-xs text-[hsl(var(--primary))]">{store.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}</p>
           )}
+          {store.description && (
+            <p className="line-clamp-2 text-xs text-muted-foreground">{store.description}</p>
+          )}
           <div className="flex flex-wrap items-center gap-1.5">
             <RatingPill rating={store.rating} count={store.review_count} />
             <DistanceChip km={store.distance_km} />
@@ -38,7 +41,7 @@ export function StoreCard({ store, onClick }) {
           <div className="flex items-center gap-1.5">
             <VerifiedBadge />
             <span data-testid="store-card-open-status" className="text-xs text-muted-foreground">
-              {store.website ? 'Visit website' : store.is_open ? 'Open now' : 'Closed'}
+              {store.is_open !== false ? 'Open now' : 'Closed'}
             </span>
           </div>
         </div>

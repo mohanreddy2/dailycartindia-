@@ -56,6 +56,11 @@ export default function StoreDetail() {
             {store.min_order > 0 && <span>· Min order {inr(store.min_order)}</span>}
             <span>· {store.is_open ? 'Open now' : 'Closed'}</span>
           </div>
+          {store.website && (
+            <a href={store.website} target="_blank" rel="noreferrer">
+              <Button type="button" variant="outline" size="sm">Visit website</Button>
+            </a>
+          )}
         </div>
       </Card>
 

@@ -38,14 +38,14 @@ export default function VendorsAdmin() {
   const change = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const openCreate = () => {
     setSelected(null);
-    setForm({ user_id: '', type: 'mart', name: '', description: '', category_slugs: '', address: '', city: '', lat: '', lng: '', min_order: 0, delivery_fee: 25, kyc_id_type: 'aadhaar', kyc_id_number: '' });
+    setForm({ user_id: '', type: 'mart', name: '', description: '', category_slugs: '', address: '', city: '', lat: '', lng: '', min_order: 0, delivery_fee: 25, kyc_id_type: 'aadhaar', kyc_id_number: '', website: '', image: '', featured: false });
   };
   const openEdit = async (vendor) => {
     setBusyId(vendor.id);
     try {
       const { data } = await api.get(`/admin/vendors/${vendor.id}`);
       setSelected(data);
-      setForm({ name: data.name || '', description: data.description || '', category_slugs: (data.category_slugs || []).join(', '), address: data.address || '', city: data.city || '', lat: data.location?.coordinates?.[1] ?? '', lng: data.location?.coordinates?.[0] ?? '', min_order: data.min_order ?? 0, delivery_fee: data.delivery_fee ?? 0, is_open: data.is_open !== false });
+      setForm({ name: data.name || '', description: data.description || '', category_slugs: (data.category_slugs || []).join(', '), address: data.address || '', city: data.city || '', lat: data.location?.coordinates?.[1] ?? '', lng: data.location?.coordinates?.[0] ?? '', min_order: data.min_order ?? 0, delivery_fee: data.delivery_fee ?? 0, is_open: data.is_open !== false, website: data.website || '', image: data.image || '', featured: Boolean(data.featured) });
     } catch (error) { toast.error(errMsg(error)); } finally { setBusyId(null); }
   };
   const save = async (event) => {
@@ -149,6 +149,12 @@ export default function VendorsAdmin() {
               </>}
               <div className="space-y-1"><Label htmlFor="vendor-name">Business name</Label><Input id="vendor-name" required value={form.name} onChange={(e) => change('name', e.target.value)} /></div>
               <div className="space-y-1"><Label htmlFor="vendor-description">Description</Label><Textarea id="vendor-description" value={form.description} onChange={(e) => change('description', e.target.value)} /></div>
+              <div className="space-y-1"><Label htmlFor="vendor-website">Website</Label><Input id="vendor-website" type="url" placeholder="https://" value={form.website} onChange={(e) => change('website', e.target.value)} /></div>
+              <div className="space-y-1"><Label htmlFor="vendor-image">Photo URL</Label><Input id="vendor-image" placeholder="https://" value={form.image} onChange={(e) => change('image', e.target.value)} /></div>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={Boolean(form.featured)} onChange={(e) => change('featured', e.target.checked)} />
+                Featured (show in every city)
+              </label>
               <div className="space-y-1"><Label htmlFor="vendor-categories">Categories</Label><Input id="vendor-categories" placeholder="groceries, dairy" value={form.category_slugs} onChange={(e) => change('category_slugs', e.target.value)} /></div>
               <div className="space-y-1"><Label htmlFor="vendor-address">Address</Label><Input id="vendor-address" required value={form.address} onChange={(e) => change('address', e.target.value)} /></div>
               <div className="grid grid-cols-3 gap-2"><div className="space-y-1"><Label>City</Label><Input required value={form.city} onChange={(e) => change('city', e.target.value)} /></div><div className="space-y-1"><Label>Latitude</Label><Input type="number" step="any" required value={form.lat} onChange={(e) => change('lat', e.target.value)} /></div><div className="space-y-1"><Label>Longitude</Label><Input type="number" step="any" required value={form.lng} onChange={(e) => change('lng', e.target.value)} /></div></div>

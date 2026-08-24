@@ -1,4 +1,4 @@
-/** Mohan's live shops — shown on DailyCart Home under Kirana stores. Fill catalog/address later in admin. */
+/** Mohan's live shops — merged into Home kirana cards. Live Mongo vendors (same names) win for /store/:id. */
 export const NETWORK_STORES = [
   {
     id: 'network-dailycart24x7',
@@ -79,28 +79,31 @@ export const NETWORK_STORES = [
   },
 ];
 
-function hostOf(url) {
-  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; }
-}
-
 export function mergeNetworkStores(apiStores = []) {
-  const names = new Set(apiStores.map((s) => (s.name || '').toLowerCase()));
-  const hosts = new Set(
-    apiStores
-      .map((s) => hostOf(s.website || ''))
-      .filter(Boolean),
-  );
-  const extra = NETWORK_STORES.filter((s) => {
-    const host = hostOf(s.website);
-    return !names.has(s.name.toLowerCase()) && !hosts.has(host);
+  const catalog = new Map(NETWORK_STORES.map((s) => [s.name.toLowerCase(), s]));
+  const enriched = apiStores.map((s) => {
+    const extra = catalog.get((s.name || '').toLowerCase());
+    if (!extra) return s;
+    return {
+      ...extra,
+      ...s,
+      image: s.image || extra.image,
+      website: s.website || extra.website,
+      description: s.description || extra.description,
+      address: s.address || extra.address,
+    };
   });
-  return [...extra, ...apiStores];
+  const names = new Set(enriched.map((s) => (s.name || '').toLowerCase()));
+  const extra = NETWORK_STORES.filter((s) => !names.has(s.name.toLowerCase()));
+  return [...extra, ...enriched];
 }
 
 export function openStore(store, navigate) {
-  if (store?.website) {
-    window.open(store.website, '_blank', 'noopener,noreferrer');
+  if (store?.id && !String(store.id).startsWith('network-') && navigate) {
+    navigate(`/store/${store.id}`);
     return;
   }
-  if (store?.id && navigate) navigate(`/store/${store.id}`);
+  if (store?.website) {
+    window.open(store.website, '_blank', 'noopener,noreferrer');
+  }
 }

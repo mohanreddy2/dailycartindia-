@@ -73,6 +73,15 @@ async def discovery(
 
     if kind in (None, "mart"):
         stores = await geo_vendors(lat, lng, radius_km, extra_mart, limit)
+        featured = strip_id(await db.vendors.find(live_vendor_query({**extra_mart, "featured": True})).to_list(30))
+        seen = {s["id"] for s in stores}
+        for f in featured:
+            if f["id"] in seen:
+                continue
+            f = public_vendor(f)
+            f["distance_km"] = None
+            stores.append(f)
+            seen.add(f["id"])
         if rx:
             store_ids = [s["id"] for s in stores]
             prods = await db.products.find({

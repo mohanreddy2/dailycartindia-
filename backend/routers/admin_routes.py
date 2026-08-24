@@ -62,6 +62,9 @@ class AdminVendorCreate(BaseModel):
     delivery_fee: float = Field(25, ge=0)
     kyc_id_type: str = "aadhaar"
     kyc_id_number: str = Field(..., min_length=4)
+    image: Optional[str] = None
+    website: Optional[str] = None
+    featured: bool = False
 
 
 class AdminVendorUpdate(BaseModel):
@@ -75,6 +78,9 @@ class AdminVendorUpdate(BaseModel):
     min_order: Optional[float] = Field(None, ge=0)
     delivery_fee: Optional[float] = Field(None, ge=0)
     is_open: Optional[bool] = None
+    image: Optional[str] = None
+    website: Optional[str] = None
+    featured: Optional[bool] = None
 
 
 def public_user(user: dict) -> dict:
@@ -173,6 +179,7 @@ async def create_vendor(body: AdminVendorCreate, admin: dict = Depends(require_a
         "description": body.description, "category_slugs": body.category_slugs,
         "address": body.address, "city": body.city,
         "location": {"type": "Point", "coordinates": [body.lng, body.lat]},
+        "image": body.image, "website": body.website, "featured": body.featured,
         "rating": 0, "review_count": 0, "min_order": body.min_order, "delivery_fee": body.delivery_fee,
         "kyc_status": "pending",
         "kyc": {"id_type": body.kyc_id_type, "id_number": body.kyc_id_number, "submitted_at": now_iso()},
