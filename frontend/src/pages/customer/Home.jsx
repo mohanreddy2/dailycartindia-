@@ -11,6 +11,7 @@ import { api } from '../../lib/api';
 import { useLocationCtx } from '../../lib/store';
 import { RatingPill, DistanceChip, VerifiedBadge, CardSkeletons, EmptyState } from '../../components/shared/bits';
 import { Thumb } from '../../components/shared/thumb';
+import { mergeNetworkStores, openStore } from '../../data/networkStores';
 
 const CAT_ICONS = {
   'shopping-basket': ShoppingBasket, milk: Milk, apple: Apple, cookie: Cookie, 'spray-can': SprayCan,
@@ -27,13 +28,18 @@ export function StoreCard({ store, onClick }) {
         <Thumb src={store.image} alt={store.name} className="h-24 w-full" />
         <div className="space-y-1.5 p-3">
           <p className="truncate text-sm font-semibold">{store.name}</p>
+          {store.website && (
+            <p className="truncate text-xs text-[hsl(var(--primary))]">{store.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}</p>
+          )}
           <div className="flex flex-wrap items-center gap-1.5">
             <RatingPill rating={store.rating} count={store.review_count} />
             <DistanceChip km={store.distance_km} />
           </div>
           <div className="flex items-center gap-1.5">
             <VerifiedBadge />
-            <span data-testid="store-card-open-status" className="text-xs text-muted-foreground">{store.is_open ? 'Open now' : 'Closed'}</span>
+            <span data-testid="store-card-open-status" className="text-xs text-muted-foreground">
+              {store.website ? 'Visit website' : store.is_open ? 'Open now' : 'Closed'}
+            </span>
           </div>
         </div>
       </Card>
@@ -83,7 +89,7 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.lat, location.lng]);
 
-  const stores = data?.stores || [];
+  const stores = mergeNetworkStores(data?.stores || []);
   const vendors = data?.service_vendors || [];
 
   return (
@@ -140,7 +146,7 @@ export default function Home() {
           <EmptyState icon={Store} title="No stores nearby yet" subtitle={`DailyCart hasn’t onboarded stores around ${location.name} yet. Try Hyderabad, Bangalore, Pune, Delhi, Vizag or Bhimavaram.`} />
         ) : (
           <div data-testid="nearby-stores-grid" className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {stores.map((s) => <StoreCard key={s.id} store={s} onClick={() => navigate(`/store/${s.id}`)} />)}
+            {stores.map((s) => <StoreCard key={s.id} store={s} onClick={() => openStore(s, navigate)} />)}
           </div>
         )}
       </section>

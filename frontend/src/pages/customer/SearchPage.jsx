@@ -10,6 +10,7 @@ import { StoreCard, ServiceVendorCard } from './Home';
 import { CardSkeletons, EmptyState, RatingPill, DistanceChip } from '../../components/shared/bits';
 import { Thumb } from '../../components/shared/thumb';
 import { toast } from 'sonner';
+import { mergeNetworkStores, openStore } from '../../data/networkStores';
 
 export default function SearchPage() {
   const [params, setParams] = useSearchParams();
@@ -52,7 +53,8 @@ export default function SearchPage() {
   };
 
   const products = results?.products || [];
-  const stores = results?.stores || [];
+  const nearbyStores = results?.stores || [];
+  const stores = (!q.trim() && kind !== 'service') ? mergeNetworkStores(nearbyStores) : nearbyStores;
   const vendors = results?.service_vendors || [];
   const services = results?.services || [];
   const nothing = !loading && products.length === 0 && stores.length === 0 && vendors.length === 0 && services.length === 0;
@@ -142,7 +144,7 @@ export default function SearchPage() {
         <section>
           <h2 className="mb-3 font-display text-lg font-semibold">Stores</h2>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {stores.map((s) => <StoreCard key={s.id} store={s} onClick={() => navigate(`/store/${s.id}`)} />)}
+            {stores.map((s) => <StoreCard key={s.id} store={s} onClick={() => openStore(s, navigate)} />)}
           </div>
         </section>
       )}
