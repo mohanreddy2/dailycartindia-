@@ -10,7 +10,7 @@ import { StoreCard, ServiceVendorCard } from './Home';
 import { CardSkeletons, EmptyState, RatingPill, DistanceChip } from '../../components/shared/bits';
 import { Thumb } from '../../components/shared/thumb';
 import { toast } from 'sonner';
-import { mergeNetworkStores, openStore } from '../../data/networkStores';
+import { mergeNetworkStores, mergeNetworkServices, openStore, openService } from '../../data/networkStores';
 
 export default function SearchPage() {
   const [params, setParams] = useSearchParams();
@@ -55,7 +55,8 @@ export default function SearchPage() {
   const products = results?.products || [];
   const nearbyStores = results?.stores || [];
   const stores = (!q.trim() && kind !== 'service') ? mergeNetworkStores(nearbyStores) : nearbyStores;
-  const vendors = results?.service_vendors || [];
+  const nearbyVendors = results?.service_vendors || [];
+  const vendors = (!q.trim() && kind !== 'mart') ? mergeNetworkServices(nearbyVendors) : nearbyVendors;
   const services = results?.services || [];
   const nothing = !loading && products.length === 0 && stores.length === 0 && vendors.length === 0 && services.length === 0;
 
@@ -153,7 +154,7 @@ export default function SearchPage() {
         <section>
           <h2 className="mb-3 font-display text-lg font-semibold">Service providers</h2>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {vendors.map((v) => <ServiceVendorCard key={v.id} vendor={v} onClick={() => navigate(`/pro/${v.id}`)} />)}
+            {vendors.map((v) => <ServiceVendorCard key={v.id} vendor={v} onClick={() => openService(v, navigate)} />)}
           </div>
         </section>
       )}

@@ -107,3 +107,47 @@ export function openStore(store, navigate) {
     window.open(store.website, '_blank', 'noopener,noreferrer');
   }
 }
+
+/** Partner apps listed under Home services. Click opens the live listing. */
+export const NETWORK_SERVICES = [
+  {
+    id: 'network-justaround',
+    name: 'JustAround',
+    website: 'https://play.google.com/store/apps/details?id=com.geosentry.justaround',
+    description: 'Borrow, rent, or hire neighbours within 5 km — tools, repairs, tutoring, and more. A Geosentry.AI app.',
+    address: 'Bengaluru',
+    city: 'Bangalore',
+    image: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=600&q=60',
+    category_slugs: ['plumber', 'electrician', 'appliance', 'ironing'],
+    is_open: true,
+  },
+];
+
+export function mergeNetworkServices(apiVendors = []) {
+  const catalog = new Map(NETWORK_SERVICES.map((s) => [s.name.toLowerCase(), s]));
+  const enriched = apiVendors.map((s) => {
+    const extra = catalog.get((s.name || '').toLowerCase());
+    if (!extra) return s;
+    return {
+      ...extra,
+      ...s,
+      image: s.image || extra.image,
+      website: s.website || extra.website,
+      description: s.description || extra.description,
+      address: s.address || extra.address,
+    };
+  });
+  const names = new Set(enriched.map((s) => (s.name || '').toLowerCase()));
+  const extra = NETWORK_SERVICES.filter((s) => !names.has(s.name.toLowerCase()));
+  return [...extra, ...enriched];
+}
+
+export function openService(vendor, navigate) {
+  if (vendor?.id && !String(vendor.id).startsWith('network-') && navigate) {
+    navigate(`/pro/${vendor.id}`);
+    return;
+  }
+  if (vendor?.website) {
+    window.open(vendor.website, '_blank', 'noopener,noreferrer');
+  }
+}

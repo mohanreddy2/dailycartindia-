@@ -11,7 +11,7 @@ import { api } from '../../lib/api';
 import { useLocationCtx } from '../../lib/store';
 import { RatingPill, DistanceChip, VerifiedBadge, CardSkeletons, EmptyState } from '../../components/shared/bits';
 import { Thumb } from '../../components/shared/thumb';
-import { mergeNetworkStores, openStore } from '../../data/networkStores';
+import { mergeNetworkStores, mergeNetworkServices, openStore, openService } from '../../data/networkStores';
 
 const CAT_ICONS = {
   'shopping-basket': ShoppingBasket, milk: Milk, apple: Apple, cookie: Cookie, 'spray-can': SprayCan,
@@ -58,6 +58,12 @@ export function ServiceVendorCard({ vendor, onClick }) {
         <Thumb src={vendor.image} alt={vendor.name} className="h-24 w-full" tone="serve" />
         <div className="space-y-1.5 p-3">
           <p className="truncate text-sm font-semibold">{vendor.name}</p>
+          {vendor.website && (
+            <p className="truncate text-xs text-[hsl(var(--serve))]">{vendor.website.includes('play.google.com') ? 'Google Play' : vendor.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}</p>
+          )}
+          {vendor.description && (
+            <p className="line-clamp-2 text-xs text-muted-foreground">{vendor.description}</p>
+          )}
           <div className="flex flex-wrap items-center gap-1.5">
             <RatingPill rating={vendor.rating} count={vendor.review_count} />
             <DistanceChip km={vendor.distance_km} />
@@ -93,7 +99,7 @@ export default function Home() {
   }, [location.lat, location.lng]);
 
   const stores = mergeNetworkStores(data?.stores || []);
-  const vendors = data?.service_vendors || [];
+  const vendors = mergeNetworkServices(data?.service_vendors || []);
 
   return (
     <div className="space-y-8 py-5">
@@ -165,7 +171,7 @@ export default function Home() {
           <EmptyState icon={Wrench} title="No service pros nearby yet" subtitle="Try another city from the location picker." />
         ) : (
           <div data-testid="nearby-services-grid" className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {vendors.map((v) => <ServiceVendorCard key={v.id} vendor={v} onClick={() => navigate(`/pro/${v.id}`)} />)}
+            {vendors.map((v) => <ServiceVendorCard key={v.id} vendor={v} onClick={() => openService(v, navigate)} />)}
           </div>
         )}
       </section>
