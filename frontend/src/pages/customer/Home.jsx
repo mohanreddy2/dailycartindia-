@@ -11,7 +11,7 @@ import { api } from '../../lib/api';
 import { useLocationCtx } from '../../lib/store';
 import { RatingPill, DistanceChip, VerifiedBadge, CardSkeletons, EmptyState } from '../../components/shared/bits';
 import { Thumb } from '../../components/shared/thumb';
-import { mergeNetworkStores, mergeNetworkServices, openStore, openService } from '../../data/networkStores';
+import { NETWORK_STORES, mergeNetworkStores, mergeNetworkServices, openStore, openService, displayHost } from '../../data/networkStores';
 
 const CAT_ICONS = {
   'shopping-basket': ShoppingBasket, milk: Milk, apple: Apple, cookie: Cookie, 'spray-can': SprayCan,
@@ -29,7 +29,11 @@ export function StoreCard({ store, onClick }) {
         <div className="space-y-1.5 p-3">
           <p className="truncate text-sm font-semibold">{store.name}</p>
           {store.website && (
-            <p className="truncate text-xs text-[hsl(var(--primary))]">{store.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}</p>
+            <a href={store.website} target="_blank" rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="block truncate text-xs text-[hsl(var(--primary))] underline-offset-2 hover:underline">
+              {displayHost(store.website)}
+            </a>
           )}
           {store.description && (
             <p className="line-clamp-2 text-xs text-muted-foreground">{store.description}</p>
@@ -59,7 +63,11 @@ export function ServiceVendorCard({ vendor, onClick }) {
         <div className="space-y-1.5 p-3">
           <p className="truncate text-sm font-semibold">{vendor.name}</p>
           {vendor.website && (
-            <p className="truncate text-xs text-[hsl(var(--serve))]">{vendor.website.includes('play.google.com') ? 'Google Play' : vendor.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}</p>
+            <a href={vendor.website} target="_blank" rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="block truncate text-xs text-[hsl(var(--serve))] underline-offset-2 hover:underline">
+              {displayHost(vendor.website)}
+            </a>
           )}
           {vendor.description && (
             <p className="line-clamp-2 text-xs text-muted-foreground">{vendor.description}</p>
@@ -151,7 +159,15 @@ export default function Home() {
             <Store className="h-5 w-5 text-[hsl(var(--primary))]" /> Kirana stores near you
           </h2>
         </div>
-        {loading ? <CardSkeletons n={4} /> : stores.length === 0 ? (
+        <div className="mb-3 flex flex-wrap gap-2" data-testid="kirana-website-links">
+          {NETWORK_STORES.map((s) => (
+            <a key={s.id} href={s.website} target="_blank" rel="noopener noreferrer"
+              className="rounded-full border bg-card px-3 py-1 text-xs font-medium text-[hsl(var(--primary))] shadow-sm transition-colors hover:bg-accent">
+              {displayHost(s.website)}
+            </a>
+          ))}
+        </div>
+        {loading && stores.length === 0 ? <CardSkeletons n={4} /> : stores.length === 0 ? (
           <EmptyState icon={Store} title="No stores nearby yet" subtitle={`DailyCart hasn’t onboarded stores around ${location.name} yet. Try Hyderabad, Bangalore, Pune, Delhi, Vizag or Bhimavaram.`} />
         ) : (
           <div data-testid="nearby-stores-grid" className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -167,7 +183,7 @@ export default function Home() {
             <Wrench className="h-5 w-5 text-[hsl(var(--serve))]" /> Home services near you
           </h2>
         </div>
-        {loading ? <CardSkeletons n={4} /> : vendors.length === 0 ? (
+        {loading && vendors.length === 0 ? <CardSkeletons n={4} /> : vendors.length === 0 ? (
           <EmptyState icon={Wrench} title="No service pros nearby yet" subtitle="Try another city from the location picker." />
         ) : (
           <div data-testid="nearby-services-grid" className="grid grid-cols-2 gap-3 md:grid-cols-4">

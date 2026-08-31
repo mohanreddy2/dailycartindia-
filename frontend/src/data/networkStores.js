@@ -1,4 +1,56 @@
 /** Mohan's live shops — merged into Home kirana cards. Live Mongo vendors (same names) win for /store/:id. */
+
+export function hostKey(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+  } catch {
+    return String(url || '').replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase();
+  }
+}
+
+export function displayHost(url) {
+  if (!url) return '';
+  if (url.includes('play.google.com')) return 'Google Play';
+  return hostKey(url);
+}
+
+function mergeCatalog(list, apiItems = []) {
+  const byName = new Map(list.map((s) => [s.name.toLowerCase(), s]));
+  const byHost = new Map(list.filter((s) => s.website).map((s) => [hostKey(s.website), s]));
+  const seenNames = new Set();
+  const seenHosts = new Set();
+  const enriched = [];
+
+  for (const item of apiItems) {
+    const name = (item.name || '').trim();
+    if (!name) continue;
+    const extra = byName.get(name.toLowerCase()) || byHost.get(hostKey(item.website));
+    const merged = extra
+      ? {
+          ...extra,
+          ...item,
+          name,
+          image: item.image || extra.image,
+          website: item.website || extra.website,
+          description: item.description || extra.description,
+          address: item.address || extra.address,
+        }
+      : item;
+    const host = hostKey(merged.website);
+    const nameKey = (merged.name || '').toLowerCase();
+    if (seenNames.has(nameKey) || (host && seenHosts.has(host))) continue;
+    seenNames.add(nameKey);
+    if (host) seenHosts.add(host);
+    enriched.push(merged);
+  }
+
+  const extra = list.filter((s) => {
+    const host = hostKey(s.website);
+    return !seenNames.has(s.name.toLowerCase()) && !(host && seenHosts.has(host));
+  });
+  return [...extra, ...enriched];
+}
+
 export const NETWORK_STORES = [
   {
     id: 'network-dailycart24x7',
@@ -80,22 +132,7 @@ export const NETWORK_STORES = [
 ];
 
 export function mergeNetworkStores(apiStores = []) {
-  const catalog = new Map(NETWORK_STORES.map((s) => [s.name.toLowerCase(), s]));
-  const enriched = apiStores.map((s) => {
-    const extra = catalog.get((s.name || '').toLowerCase());
-    if (!extra) return s;
-    return {
-      ...extra,
-      ...s,
-      image: s.image || extra.image,
-      website: s.website || extra.website,
-      description: s.description || extra.description,
-      address: s.address || extra.address,
-    };
-  });
-  const names = new Set(enriched.map((s) => (s.name || '').toLowerCase()));
-  const extra = NETWORK_STORES.filter((s) => !names.has(s.name.toLowerCase()));
-  return [...extra, ...enriched];
+  return mergeCatalog(NETWORK_STORES, apiStores);
 }
 
 export function openStore(store, navigate) {
@@ -124,22 +161,7 @@ export const NETWORK_SERVICES = [
 ];
 
 export function mergeNetworkServices(apiVendors = []) {
-  const catalog = new Map(NETWORK_SERVICES.map((s) => [s.name.toLowerCase(), s]));
-  const enriched = apiVendors.map((s) => {
-    const extra = catalog.get((s.name || '').toLowerCase());
-    if (!extra) return s;
-    return {
-      ...extra,
-      ...s,
-      image: s.image || extra.image,
-      website: s.website || extra.website,
-      description: s.description || extra.description,
-      address: s.address || extra.address,
-    };
-  });
-  const names = new Set(enriched.map((s) => (s.name || '').toLowerCase()));
-  const extra = NETWORK_SERVICES.filter((s) => !names.has(s.name.toLowerCase()));
-  return [...extra, ...enriched];
+  return mergeCatalog(NETWORK_SERVICES, apiVendors);
 }
 
 export function openService(vendor, navigate) {
