@@ -1,6 +1,8 @@
 """Private thanks2all ledger vault. PIN-gated, encrypted blob, not shop data."""
 from __future__ import annotations
+import re
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -35,8 +37,28 @@ class PinChangeBody(BaseModel):
     vault: str = Field(..., min_length=8)
 
 
+SHARE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
+MAX_SHARE_TXNS = 400
+
+
+class ShareSnapshot(BaseModel):
+    name: str = Field(..., min_length=1, max_length=80)
+    notes: str = Field("", max_length=2000)
+    sheet: list[dict[str, Any]] = Field(default_factory=list)
+    txns: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ShareBody(PinBody):
+    share_id: str = Field(..., min_length=8, max_length=80)
+    snapshot: ShareSnapshot
+
+
 def _col():
     return db.thanks2all_khata
+
+
+def _shares():
+    return db.thanks2all_khata_shares
 
 
 def _client_ip(request: Request) -> str:
@@ -187,3 +209,53 @@ async def change_pin(body: PinChangeBody, request: Request):
         },
     )
     return {"ok": True}
+
+
+def _public_share(doc: dict) -> dict:
+    return {
+        "id": doc.get("id"),
+        "name": doc.get("name"),
+        "notes": doc.get("notes") or "",
+        "sheet": doc.get("sheet") or [],
+        "txns": doc.get("txns") or [],
+        "updated_at": doc.get("updated_at"),
+    }
+
+
+@router.get("/share/{share_id}")
+async def get_share(share_id: str):
+    if not SHARE_ID_RE.match(share_id):
+        raise HTTPException(status_code=404, detail="Shared sheet not found.")
+    doc = await _shares().find_one({"id": share_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Shared sheet not found.")
+    return _public_share(doc)
+
+
+@router.post("/share")
+async def put_share(body: ShareBody, request: Request):
+    _guard_ip(request)
+    if not SHARE_ID_RE.match(body.share_id):
+        raise HTTPException(status_code=400, detail="Invalid share id.")
+    if len(body.snapshot.txns) > MAX_SHARE_TXNS:
+        raise HTTPException(status_code=400, detail="Too many ledger lines to share.")
+    doc = await _doc()
+    if not doc:
+        raise HTTPException(status_code=404, detail="No cloud books yet.")
+    if _locked(doc):
+        raise HTTPException(status_code=423, detail="Too many PIN tries. Wait 15 minutes.")
+    if not verify_password(body.pin, doc.get("pin_hash") or ""):
+        _fail_ip(request)
+        await _record_fail(doc)
+        raise HTTPException(status_code=401, detail="Wrong PIN.")
+    _ok_ip(request)
+    payload = {
+        "id": body.share_id,
+        "name": body.snapshot.name,
+        "notes": body.snapshot.notes,
+        "sheet": body.snapshot.sheet,
+        "txns": body.snapshot.txns,
+        "updated_at": now_iso(),
+    }
+    await _shares().update_one({"id": body.share_id}, {"$set": payload}, upsert=True)
+    return {"ok": True, "id": body.share_id, "updated_at": payload["updated_at"]}
