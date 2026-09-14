@@ -13,6 +13,7 @@ from routers.customer_routes import router as customer_router
 from routers.vendor_routes import router as vendor_router
 from routers.admin_routes import router as admin_router
 from routers.payment_routes import router as payment_router
+from routers.khata_routes import router as khata_router
 from seed import seed, ensure_indexes
 
 app = FastAPI(title="DailyCart API", version="1.0.0")
@@ -40,13 +41,19 @@ api_router.include_router(customer_router)
 api_router.include_router(vendor_router)
 api_router.include_router(admin_router)
 api_router.include_router(payment_router)
+api_router.include_router(khata_router)
 
 app.include_router(api_router)
+
+_cors = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
+for _origin in ("https://thanks2all.org", "https://www.thanks2all.org"):
+    if _origin not in _cors:
+        _cors.append(_origin)
 
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+    allow_origins=_cors,
     allow_methods=["*"],
     allow_headers=["*"],
 )
