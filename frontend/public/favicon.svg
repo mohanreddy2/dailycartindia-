@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="DailyCart">
+  <title>DailyCart</title>
+  <rect width="128" height="128" rx="24" fill="#ffffff"/>
+  <path d="M22 58 H44" fill="none" stroke="#FFD400" stroke-width="7" stroke-linecap="round"/>
+  <path d="M18 72 H40" fill="none" stroke="#7FBA00" stroke-width="7" stroke-linecap="round"/>
+  <path d="M22 86 H44" fill="none" stroke="#00A4EF" stroke-width="7" stroke-linecap="round"/>
+  <path d="M48 102 V62 L82 22 L116 62 V72" fill="none" stroke="#F25022" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M76 46 C66 36 54 44 56 56 C66 58 76 54 76 46Z" fill="#7FBA00"/>
+  <path d="M56 72 H110 C116 72 120 76 120 82 V100 H56 Z" fill="none" stroke="#00A4EF" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M110 72 C122 62 122 46 104 42" fill="none" stroke="#00A4EF" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="70" cy="112" r="7" fill="none" stroke="#00A4EF" stroke-width="5"/>
+  <circle cx="104" cy="112" r="7" fill="none" stroke="#00A4EF" stroke-width="5"/>
+</svg>

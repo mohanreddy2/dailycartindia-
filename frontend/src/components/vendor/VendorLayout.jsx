@@ -137,9 +137,9 @@ export default function VendorLayout() {
     <div className="portal-vendor min-h-screen bg-background">
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
         <div className="flex items-center gap-3 px-4 py-3">
-          <Link to="/vendor" className="flex items-center gap-1.5 font-display text-lg font-bold tracking-tight">
-            <Store className="h-5 w-5 text-[hsl(var(--primary))]" aria-hidden />
-            Daily<span className="text-[hsl(var(--primary))]">Pro</span>
+          <Link to="/vendor" className="flex items-center gap-2">
+            <img src="/dailycart-logo.png" alt="DailyCart" className="h-8 w-auto max-w-[140px] object-contain" />
+            <span className="font-display text-sm font-bold tracking-tight">Daily<span className="text-[hsl(var(--primary))]">Pro</span></span>
           </Link>
           <span
             className="hidden max-w-[200px] truncate rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground sm:inline-block"

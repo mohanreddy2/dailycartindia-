@@ -40,9 +40,9 @@ export default function AdminLayout() {
     <div className="portal-admin min-h-screen bg-background">
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
         <div className="flex items-center gap-3 px-4 py-3">
-          <Link to="/admin" className="flex items-center gap-1.5 font-display text-lg font-bold tracking-tight">
-            <Shield className="h-5 w-5 text-[hsl(var(--primary))]" aria-hidden />
-            DailyCart <span className="text-[hsl(var(--primary))]">Ops</span>
+          <Link to="/admin" className="flex items-center gap-2">
+            <img src="/dailycart-logo.png" alt="DailyCart" className="h-8 w-auto max-w-[150px] object-contain" />
+            <span className="font-display text-sm font-bold tracking-tight text-[hsl(var(--primary))]">Ops</span>
           </Link>
           <div className="ml-auto flex items-center gap-2">
             <span className="hidden text-sm text-muted-foreground sm:block">{user.name}</span>

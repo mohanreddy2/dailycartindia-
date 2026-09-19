@@ -67,6 +67,7 @@ export default function AuthPage({ portal = 'customer' }) {
   return (
     <div className="mx-auto max-w-md py-8">
       <div className="mb-6 text-center">
+        <img src="/dailycart-logo.png" alt="Daily Cart 24/7" className="mx-auto mb-4 h-12 w-auto max-w-[240px] object-contain" />
         <h1 className="font-display text-2xl font-bold">
           {portal === 'vendor' ? 'DailyPro Partner' : portal === 'admin' ? 'DailyCart Ops' : 'Welcome to DailyCart'}
         </h1>

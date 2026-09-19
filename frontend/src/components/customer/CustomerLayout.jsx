@@ -144,8 +144,12 @@ export default function CustomerLayout() {
     <div className="min-h-screen bg-background pb-20 md:pb-8">
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
-          <Link to="/" className="flex items-center gap-1 font-display text-lg font-bold tracking-tight">
-            <span className="text-[hsl(var(--primary))]">Daily</span>Cart
+          <Link to="/" className="flex shrink-0 items-center" aria-label="Daily Cart 24/7">
+            <img
+              src="/dailycart-logo.png"
+              alt="Daily Cart 24/7 — Wealth, Health, Time"
+              className="h-9 w-auto max-w-[168px] object-contain sm:h-10 sm:max-w-[200px]"
+            />
           </Link>
           <LocationPicker />
           <div className="ml-auto flex items-center gap-2">
